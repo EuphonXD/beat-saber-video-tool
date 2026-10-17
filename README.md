@@ -43,6 +43,10 @@
 
 ![试看弹窗](docs/shot_preview.jpg)
 
+🎥 **动图演示**（点开试看 → 视频播放 → 3D 谱面预览 + 底部频谱对比）：
+
+![试看弹窗演示](docs/demo_preview.gif)
+
 ---
 
 
