@@ -1,0 +1,2825 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Beat Saber 视频工具 · 网页版</title>
+<style>
+  :root{
+    color-scheme: dark;   /* 原生控件/下拉列表按深色渲染（修复白底白字） */
+    /* ── 夜航场景（颜色都归背景） ── */
+    --bg:#0B1322; --card:rgba(255,255,255,.08); --card2:rgba(255,255,255,.06);
+    --line:rgba(255,255,255,.15); --line2:rgba(255,255,255,.30);
+    --txt:#F5F7FB; --dim:rgba(255,255,255,.60); --dim2:rgba(255,255,255,.40);
+    /* ── 唯一强调色：香槟金 ── */
+    --accent:#E4B863; --gold-bright:#F3DCA8;
+    --ok:#8FD6B4; --warn:#E8CD8A; --err:#E89A97; --cyan:#9CC4DD;
+    --shadow:0 16px 40px rgba(3,7,18,.5),inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(2,6,16,.35);
+    --shadow-hover:0 24px 64px rgba(3,7,18,.6),inset 0 1px 0 rgba(255,255,255,.32),inset 0 -1px 0 rgba(2,6,16,.35);
+    --ease:cubic-bezier(.16,1,.3,1);
+  }
+  *{box-sizing:border-box}
+  html{color-scheme:dark}
+  body{margin:0;background:var(--bg);color:var(--txt);
+    font:14px/1.6 "Segoe UI",system-ui,"PingFang SC","Microsoft YaHei",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  /* 深墨夜景 + 2~3 个柔和光源光斑（玻璃要有东西可折射） */
+  body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
+    background:
+      radial-gradient(560px circle at 88% 6%, rgba(124,156,196,.28), transparent 65%),
+      radial-gradient(640px circle at 6% 94%, rgba(51,81,122,.35), transparent 65%),
+      radial-gradient(520px circle at 52% 38%, rgba(228,184,99,.10), transparent 62%),
+      linear-gradient(180deg,#060A13,#0B1322 45%,#060A13)}
+  /* 2.5% 颗粒噪点（消除塑料感） */
+  body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.025;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+  a{color:#fff;text-decoration:none;border-bottom:1px solid rgba(228,184,99,.35);
+    transition:color .5s var(--ease),border-color .5s var(--ease)}
+  a:hover{color:var(--gold-bright);border-color:var(--gold-bright)}
+  .wrap{max-width:1180px;margin:0 auto;padding:14px 16px 60px}
+  /* ── 顶部 ── */
+  header{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 0 6px}
+  header h1{font-size:19px;margin:0;font-weight:600;letter-spacing:.2px}
+  .chips{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap}
+  .chip{background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:999px;padding:4px 13px;font-size:12px;color:var(--dim);
+    backdrop-filter:blur(30px) saturate(160%);-webkit-backdrop-filter:blur(30px) saturate(160%);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.16);
+    transition:border-color .5s var(--ease),background .5s var(--ease)}
+  .chip:hover{border-color:var(--line2);background:rgba(255,255,255,.10)}
+  .chip b{color:var(--txt);font-weight:600}
+  .chip .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--dim);margin-right:6px;vertical-align:1px}
+  .dot.ok{background:var(--ok);box-shadow:0 0 8px rgba(143,214,180,.6)}
+  .dot.bad{background:var(--err);box-shadow:0 0 8px rgba(232,154,151,.6)}
+  .dot.warn{background:var(--warn);box-shadow:0 0 8px rgba(232,205,138,.55)}
+  /* ── 导航 ── */
+  nav{display:flex;gap:6px;border-bottom:1px solid var(--line);margin:6px 0 14px;overflow-x:auto}
+  nav button{background:none;border:none;color:var(--dim);padding:10px 16px;font-size:14px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap;
+    transition:color .5s var(--ease),background .5s var(--ease),border-color .5s var(--ease)}
+  nav button:hover{color:#fff;background:rgba(255,255,255,.06)}
+  nav button.on{color:#fff;border-bottom-color:var(--accent);font-weight:600;text-shadow:0 0 18px rgba(228,184,99,.35)}
+  /* ── 玻璃卡片 ── */
+  .card{position:relative;background:var(--card);border:1px solid var(--line);border-radius:24px;padding:16px 18px;margin-bottom:14px;overflow:hidden;
+    backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);
+    box-shadow:var(--shadow);
+    transition:border-color .5s var(--ease),box-shadow .5s var(--ease),transform .5s var(--ease)}
+  .card::before{content:"";position:absolute;inset:0;pointer-events:none;
+    background:linear-gradient(to bottom,rgba(255,255,255,.12),transparent 50%)}
+  .card>*{position:relative;z-index:1}
+  .card:hover{border-color:var(--line2);box-shadow:var(--shadow-hover);transform:translateY(-2px)}
+  .card h2{font-size:15px;margin:0 0 10px}
+  .toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:10px}
+  .toolbar .spacer{flex:1}
+  /* ── 按钮（主操作=香槟金 / 次操作=无色玻璃） ── */
+  button.btn,label.btn{position:relative;background:rgba(228,184,99,.15);border:1px solid rgba(228,184,99,.40);color:var(--gold-bright);
+    border-radius:16px;padding:7px 15px;font-size:13px;cursor:pointer;display:inline-block;white-space:nowrap;
+    box-shadow:0 4px 20px rgba(228,184,99,.15),inset 0 1px 0 rgba(243,220,168,.35);
+    transition:all .5s var(--ease)}
+  button.btn:hover{background:rgba(228,184,99,.22);border-color:rgba(228,184,99,.55);transform:translateY(-1px);
+    box-shadow:0 10px 30px rgba(228,184,99,.20),inset 0 1px 0 rgba(243,220,168,.45)}
+  button.btn:active{transform:scale(.97)}
+  button.btn:disabled{opacity:.45;cursor:not-allowed;transform:none}
+  button.btn.gray,label.btn.gray{background:rgba(255,255,255,.10);border-color:rgba(255,255,255,.20);color:#fff;
+    box-shadow:0 4px 16px rgba(3,7,18,.45),inset 0 1px 0 rgba(255,255,255,.25),inset 0 -1px 0 rgba(2,6,16,.30)}
+  button.btn.gray:hover{background:rgba(255,255,255,.15);border-color:rgba(255,255,255,.35);
+    box-shadow:0 10px 32px rgba(3,7,18,.55),inset 0 1px 0 rgba(255,255,255,.35)}
+  button.btn.green{background:rgba(228,184,99,.15);border-color:rgba(228,184,99,.40);color:var(--gold-bright)}
+  button.btn.red{background:rgba(232,154,151,.12);border-color:rgba(232,154,151,.38);color:#F5CBC9;
+    box-shadow:0 4px 16px rgba(3,7,18,.45),inset 0 1px 0 rgba(255,255,255,.18)}
+  .btn-sm{padding:3px 10px !important;font-size:12px !important;border-radius:12px !important;
+    background:rgba(255,255,255,.10) !important;border-color:rgba(255,255,255,.20) !important;color:#fff !important;
+    box-shadow:0 4px 16px rgba(3,7,18,.45),inset 0 1px 0 rgba(255,255,255,.25),inset 0 -1px 0 rgba(2,6,16,.30) !important}
+  button.btn.btn-sm:hover{background:rgba(255,255,255,.15) !important;border-color:rgba(255,255,255,.35) !important}
+  /* ── 表单 ── */
+  select,input[type=text],input[type=number],textarea{background:rgba(255,255,255,.06);border:1px solid var(--line);color:#fff;border-radius:16px;padding:7px 12px;font-size:13px;font-family:inherit;
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.15),inset 0 -1px 0 rgba(2,6,16,.30);
+    transition:all .5s var(--ease)}
+  select:focus,input:focus,textarea:focus{outline:none;border-color:var(--line2);background:rgba(255,255,255,.10);
+    box-shadow:0 0 0 3px rgba(228,184,99,.15),inset 0 1px 0 rgba(255,255,255,.25)}
+  select option{background-color:#0f1728;color:#fff}   /* 双保险：下拉列表项深底白字 */
+  input::placeholder,textarea::placeholder{color:rgba(255,255,255,.35)}
+  textarea{width:100%;min-height:120px;resize:vertical;font-family:Consolas,monospace;font-size:12px}
+  /* ── 表格 ── */
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{text-align:left;padding:8px;border-bottom:1px solid rgba(255,255,255,.10);vertical-align:middle}
+  th{color:var(--dim);font-weight:500;font-size:12px;white-space:nowrap}
+  tr:hover td{background:rgba(255,255,255,.05)}
+  /* ── 徽章 ── */
+  .badge{display:inline-block;padding:3px 10px;border-radius:999px;font-size:12px;white-space:nowrap;border:1px solid var(--line);
+    backdrop-filter:blur(20px) saturate(160%);-webkit-backdrop-filter:blur(20px) saturate(160%)}
+  .b-done{background:rgba(143,214,180,.12);color:var(--ok);border-color:rgba(143,214,180,.30)}
+  .b-pend{background:rgba(156,196,221,.12);color:var(--cyan);border-color:rgba(156,196,221,.30)}
+  .b-pend2{background:rgba(232,205,138,.12);color:var(--warn);border-color:rgba(232,205,138,.30)}
+  .b-need{background:rgba(255,255,255,.06);color:var(--dim);border-color:var(--line)}
+  .small{font-size:12px;color:var(--dim)}
+  .linkinput{width:100%;min-width:170px}
+  .offsetinput{width:82px}
+  .mono{font-family:Consolas,monospace;font-size:12px;color:rgba(255,255,255,.85)}
+  .logbox{background:rgba(6,10,19,.55);border:1px solid var(--line);border-radius:20px;padding:12px;height:300px;overflow:auto;font-family:Consolas,monospace;font-size:12px;white-space:pre-wrap;color:rgba(255,255,255,.80);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12),inset 0 -1px 0 rgba(2,6,16,.35)}
+  .progress{height:14px;background:rgba(255,255,255,.08);border-radius:999px;overflow:hidden;border:1px solid var(--line);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+  .progress i{display:block;height:100%;background:linear-gradient(90deg,#33517A,#7C9CC4);width:0%;transition:width .5s var(--ease)}
+  /* ── 弹窗 ── */
+  .modal{position:fixed;inset:0;background:rgba(6,10,19,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);
+    display:none;align-items:center;justify-content:center;z-index:50}
+  .modal.on{display:flex}
+  .modal .box{background:rgba(255,255,255,.12);border:1px solid var(--line);border-radius:24px;padding:20px;max-width:860px;width:92%;
+    backdrop-filter:blur(60px) saturate(180%);-webkit-backdrop-filter:blur(60px) saturate(180%);
+    box-shadow:var(--shadow)}
+  .modal video{width:100%;max-height:60vh;background:#060A13;border-radius:16px}
+  /* ── 提示 ── */
+  #toasts{position:fixed;right:16px;bottom:16px;display:flex;flex-direction:column;gap:8px;z-index:99}
+  .toast{background:rgba(255,255,255,.10);border:1px solid var(--line);border-radius:16px;padding:10px 16px;font-size:13px;max-width:420px;
+    backdrop-filter:blur(60px) saturate(180%);-webkit-backdrop-filter:blur(60px) saturate(180%);
+    box-shadow:0 16px 40px rgba(3,7,18,.5),inset 0 1px 0 rgba(255,255,255,.22),inset 0 -1px 0 rgba(2,6,16,.35);
+    animation:tin .5s var(--ease)}
+  .toast.ok{border-color:rgba(143,214,180,.35)}
+  .toast.err{border-color:rgba(232,154,151,.40)}
+  .toast.warn{border-color:rgba(232,205,138,.40)}
+  @keyframes tin{from{transform:translateY(10px);opacity:0}to{transform:none;opacity:1}}
+  .rowsep{display:grid;grid-template-columns:150px 1fr;gap:6px 14px;align-items:center;margin-top:8px}
+  .hint{font-size:12px;color:var(--dim);margin-top:4px}
+  fieldset{border:1px solid var(--line);border-radius:20px;padding:10px 14px;margin:0 0 12px;background:rgba(255,255,255,.04)}
+  legend{color:var(--dim);font-size:12px;padding:0 6px}
+  label.rad{display:block;padding:4px 0;cursor:pointer}
+  label.rad input{margin-right:7px;vertical-align:-1px}
+  .cookie-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px dashed var(--line)}
+  .cookie-row:last-child{border-bottom:none}
+  .cookie-row .nm{width:96px;font-weight:600}
+  .kot{font-size:12px;color:var(--dim);flex:1}
+  .result-inline{font-size:12px;margin-left:8px}
+  /* ── 试看 / 偏移调整 / 频谱 ── */
+  .modal .box.wide{max-width:1000px;padding:16px 18px;max-height:94vh;overflow:auto}
+  #chartCanvas{width:100%;height:auto;background:rgba(6,10,19,.6);border:1px solid var(--line);border-radius:20px;display:block}
+  .preview-grid{display:grid;grid-template-columns:1fr;gap:12px;margin-top:4px}
+  /* ── 开 3D 视频时：设置分列两侧、频谱叠加到 3D 下部 ── */
+  #modal.v3d .box.wide{display:grid;width:97vw;max-width:1480px;grid-template-columns:238px minmax(0,1fr) 238px;
+    grid-template-areas:"title title title" "l1 stage r1" "l2 stage r2" "l3 stage r3" "l4 stage r4" "l5 stage r5" "l6 stage r6";
+    column-gap:14px;row-gap:6px;align-items:start}
+  #modal.v3d .box.wide > .toolbar{grid-area:title}
+  #modal.v3d .box.wide > .preview-grid{grid-area:stage}
+  #modal.v3d .box.wide > div:nth-of-type(3){grid-area:l1}   /* 谱面设置 */
+  #modal.v3d .box.wide > div:nth-of-type(4){grid-area:l6}   /* 隐藏行 */
+  #modal.v3d .box.wide > #specWrap{grid-area:stage;align-self:end;z-index:5;margin:6px 6px 8px;pointer-events:none;
+    background:rgba(6,10,19,.55);border:1px solid var(--line);border-radius:14px;padding:6px 8px 4px;backdrop-filter:blur(6px)}
+  #modal.v3d #specWrap > .small{font-size:11px;margin-bottom:2px}
+  #modal.v3d #specCanvas{height:78px;border-radius:10px}
+  #modal.v3d .pv-controls{display:contents}
+  #modal.v3d .pv-controls > .pv-row:nth-child(1){grid-area:l2}    /* 播放 + 偏移 */
+  #modal.v3d .pv-controls > .pv-status{grid-area:l3}
+  #modal.v3d .pv-controls > .pv-row:nth-child(2){grid-area:r1}    /* 声道/音量 */
+  #modal.v3d .pv-controls > .pv-row:nth-child(3){grid-area:r2}    /* 视频维护 */
+  #modal.v3d .pv-controls > .hint{grid-area:r3}
+  #modal.v3d .pv-row{align-items:center;gap:6px;row-gap:6px}
+  #modal.v3d .pv-controls > .pv-row:nth-child(1) .btn-sm{padding:3px 7px;font-size:12px}
+  #modal.v3d #btnAutoSync, #modal.v3d #btnSaveOff{flex:1 1 100%;margin-top:0}
+  #modal.v3d #volV, #modal.v3d #volS{flex:1 1 100%;width:auto}
+  #modal.v3d .pv-controls > .pv-row:nth-child(1) #offInput{flex:0 0 76px;width:76px}
+  #modal.v3d .pv-controls > .pv-row:nth-child(1) .lbl{margin-left:0 !important}
+  #modal.v3d .pv-status{font-size:12px;line-height:1.5}
+  #modal.v3d .hint{font-size:12px;line-height:1.55;max-height:88px;overflow:auto}
+  #modal.v3d .pv-controls > .pv-row:nth-child(1){row-gap:5px !important}
+  @media (max-width:1100px){ #modal.v3d .box.wide{grid-template-columns:1fr;
+    grid-template-areas:"title" "stage" "l1" "l2" "l3" "l4" "l5" "l6" "r1" "r2" "r3" "r4" "r5" "r6"} }
+  .preview-grid > div:first-child{display:none}   /* 暂时禁用视频窗口 */
+  .preview-grid > div:nth-child(2){position:relative}
+  #pvGate{position:absolute;inset:0;z-index:8;display:flex;align-items:center;justify-content:center;border-radius:16px;
+    background:rgba(6,10,19,.52);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);color:rgba(255,255,255,.88);
+    font-size:22px;letter-spacing:3px;cursor:default;user-select:none;transition:background .5s var(--ease),color .5s var(--ease)}
+  #pvGate.ready{cursor:pointer;color:#fff}
+  #pvGate.ready:hover{background:rgba(6,10,19,.30);color:var(--gold-bright)}
+  .preview-grid video{width:100%;max-height:38vh;background:#060A13;border-radius:16px;display:block}
+  #specCanvas{width:100%;height:auto;background:rgba(6,10,19,.6);border:1px solid var(--line);border-radius:20px;display:block}
+  .pv-times{margin-top:6px}
+  .pv-controls{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+  .pv-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .pv-row + .pv-row{margin-top:8px}
+  .pv-row .lbl{color:var(--dim);font-size:12px}
+  #offInput{width:104px;text-align:center;font-family:Consolas,monospace}
+  .cbtip{cursor:pointer;user-select:none;white-space:nowrap}
+  .cbtip input{margin-right:6px;vertical-align:-1px}
+  input[type=range]{accent-color:var(--accent);vertical-align:middle}
+  .pv-status{font-size:12px;color:var(--dim);margin-top:6px;min-height:18px}
+  .dupgroup{border:1px solid var(--line);border-radius:20px;margin:10px 0;overflow:hidden;background:rgba(255,255,255,.04)}
+  .duphdr{background:rgba(255,255,255,.06);padding:7px 12px;font-size:12px;color:rgba(255,255,255,.80);border-bottom:1px solid var(--line)}
+  .duprow{display:flex;align-items:center;gap:6px;flex-wrap:wrap;padding:7px 12px;border-top:1px solid rgba(255,255,255,.08);font-size:13px}
+  .duprow .mono{color:var(--dim)}
+  /* ── 播放列表 / 挑战列表行 ── */
+  .plrow{display:flex;align-items:center;gap:6px;padding:6px 10px;border-top:1px solid rgba(255,255,255,.08);font-size:13px;
+    transition:background .5s var(--ease)}
+  .plrow:first-child{border-top:none}
+  .plrow:hover{background:rgba(255,255,255,.06)}
+  .chdrag{cursor:grab;color:var(--dim);user-select:none;padding:0 3px;font-size:15px;line-height:1;transition:color .5s var(--ease)}
+  .chdrag:hover{color:var(--gold-bright)}
+  .chdrag:active{cursor:grabbing}
+  .plrow.dragging{opacity:.4}
+  .plrow.dragover-top{box-shadow:inset 0 2px 0 var(--accent)}
+  .plrow.dragover-bottom{box-shadow:inset 0 -2px 0 var(--accent)}
+  .plpickrow{display:flex;align-items:flex-start;gap:8px;padding:6px 10px;border-top:1px solid rgba(255,255,255,.08);cursor:pointer;font-size:13px;
+    transition:background .5s var(--ease)}
+  .plpickrow:first-child{border-top:none}
+  .plpickrow:hover{background:rgba(255,255,255,.06)}
+  .plpickname{flex:1;min-width:0}
+  #plSongs,#plPickBody{border:1px solid var(--line);border-radius:20px;background:rgba(6,10,19,.45);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.10)}
+  #plSongs{max-height:52vh;overflow:auto}
+  #plPickBody{max-height:56vh;overflow:auto}
+  .songchk{margin:0;vertical-align:middle;accent-color:var(--accent)}
+  /* ── 滚动条 ── */
+  ::-webkit-scrollbar{width:10px;height:10px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.14);border-radius:999px;border:2px solid transparent;background-clip:content-box}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.26);background-clip:content-box}
+  /* ── 响应式 ── */
+  @media (max-width:900px){ .preview-grid{grid-template-columns:1fr} }
+  @media (max-width:768px){
+    body::before{background:
+      radial-gradient(420px circle at 92% 4%, rgba(124,156,196,.26), transparent 65%),
+      radial-gradient(460px circle at 4% 96%, rgba(51,81,122,.32), transparent 65%),
+      linear-gradient(180deg,#060A13,#0B1322 45%,#060A13)}
+    .card{backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);padding:14px}
+  }
+  @media (prefers-reduced-motion: reduce){
+    *{transition-duration:.01ms !important;animation-duration:.01ms !important}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🎬 Beat Saber 视频工具 <span class="small" style="font-weight:400">网页版</span></h1>
+    <div class="chips">
+      <span class="chip" id="chipCookies"><span class="dot"></span>cookies: <b>检测中…</b></span>
+      <span class="chip" id="chipProxy"><span class="dot"></span>代理: <b>—</b></span>
+      <span class="chip"><span class="dot ok"></span><b id="chipVer">v1.20-web</b></span>
+    </div>
+  </header>
+
+  <nav>
+    <button data-tab="songs" class="on">🎵 歌曲</button>
+    <button data-tab="playlists">📚 播放列表</button>
+    <button data-tab="challenges">🎬 无缝挑战</button>
+    <button data-tab="downloads">⬇️ 下载</button>
+    <button data-tab="settings">⚙️ 设置</button>
+    <button data-tab="logs">📋 日志</button>
+  </nav>
+
+  <!-- ============ 歌曲 ============ -->
+  <section id="tab-songs">
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn gray" id="btnScan">🔄 重新扫描</button>
+        <select id="flt">
+          <option value="all">全部歌曲</option>
+          <option value="need">需添加链接</option>
+          <option value="pend">待下载</option>
+          <option value="done">已下载</option>
+        </select>
+        <button class="btn gray" id="btnBatch">📋 批量粘贴链接</button>
+        <button class="btn gray" id="btnAudioDup">🔍 查重</button>
+        <button class="btn gray" id="btnPlAdd">＋ 加入播放列表</button>
+        <span class="spacer"></span>
+        <button class="btn" id="btnDlAll">⬇️ 下载全部待下载</button>
+      </div>
+      <div class="small" id="summary" style="margin-bottom:8px">加载中…</div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th style="width:34px"><input type="checkbox" id="chkAll" class="songchk" title="全选/全不选"></th>
+            <th style="width:40px">#</th><th style="width:220px">歌曲</th><th style="width:110px">状态</th>
+            <th style="width:70px">时长</th><th style="width:280px">YouTube 链接</th><th style="width:130px">偏移(ms)</th><th style="width:170px">操作</th>
+          </tr></thead>
+          <tbody id="songsBody"><tr><td colspan="8" class="small">加载中…</td></tr></tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 播放列表 ============ -->
+  <section id="tab-playlists" style="display:none">
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn gray" id="btnPlRefresh">🔄 刷新</button>
+        <button class="btn" id="btnPlNew">＋ 新建播放列表</button>
+        <button class="btn gray" id="btnPlFolder">📂 打开 Playlists 目录</button>
+        <span class="spacer"></span>
+        <span class="small" id="plSummary">加载中…</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr>
+            <th style="width:44px">封面</th><th>标题</th><th style="width:120px">作者</th>
+            <th style="width:64px">歌曲</th><th style="width:130px">本地匹配</th><th style="width:96px">总时长</th><th style="width:230px">操作</th>
+          </tr></thead>
+          <tbody id="plBody"><tr><td colspan="7" class="small">加载中…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="hint">播放列表存在游戏的 <span class="mono">Playlists</span> 目录（<span class="mono">.bplist</span>，由 PlaylistManager 读取，游戏里会出现对应歌单）。「本地匹配」= 按谱面 hash 能否在本地曲库找到（hash 由工具按「Info.dat + 各难度」算法现算）。新增/修改前会自动备份到工具目录 <span class="mono">播放列表备份\</span>。</div>
+    </div>
+  </section>
+
+  <!-- ============ 下载 ============ -->
+  <section id="tab-downloads" style="display:none">
+    <div class="card">
+      <h2>当前任务</h2>
+      <div id="jobCurrent" class="small">没有进行中的任务</div>
+      <div style="margin:10px 0"><div class="progress"><i id="jobBar"></i></div></div>
+      <div class="toolbar">
+        <button class="btn red" id="btnStop">⏹ 停止任务</button>
+        <span class="spacer"></span>
+        <span class="small" id="jobStats"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h2>结果</h2>
+      <div id="jobResults" class="small">—</div>
+    </div>
+    <div class="card">
+      <h2>实时日志</h2>
+      <div class="logbox" id="jobLog">（暂无）</div>
+    </div>
+  </section>
+
+  <!-- ============ 设置 ============ -->
+  <section id="tab-settings" style="display:none">
+    <div class="card">
+      <h2>代理设置</h2>
+      <fieldset>
+        <legend>下载/检测走哪条网络</legend>
+        <label class="rad"><input type="radio" name="pmode" value="direct"> 直连（不使用代理）</label>
+        <label class="rad"><input type="radio" name="pmode" value="local"> 本机代理 Clash（http://127.0.0.1:7890）</label>
+        <label class="rad"><input type="radio" name="pmode" value="custom"> 自定义代理：</label>
+        <div style="margin-left:24px"><input type="text" id="customProxy" style="width:420px" placeholder="如 http://127.0.0.1:7890 或 socks5://user:pass@host:port"></div>
+        <div style="margin-top:10px">
+          <button class="btn gray" id="btnTestProxy">🌐 测试当前选择的代理</button>
+          <span class="result-inline" id="proxyTestResult"></span>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend>下载画质</legend>
+        <select id="heightSel">
+          <option value="720">720p</option><option value="1080">1080p</option><option value="1440">1440p</option>
+        </select>
+      </fieldset>
+      <button class="btn green" id="btnSaveSettings">💾 保存设置</button>
+    </div>
+
+    <div class="card">
+      <h2>Cookies（YouTube 登录态）</h2>
+      <div class="hint" style="margin-bottom:8px">启动时会先尝试从<b>当前浏览器</b>读取 cookies；读取不到时可使用 cookies.txt 文件（例如从 NAS YouTube 方案复制过来的那份）。</div>
+      <fieldset>
+        <legend>使用顺序</legend>
+        <label class="rad"><input type="radio" name="cmode" value="auto"> 自动：先浏览器 → 再 cookies.txt</label>
+        <label class="rad"><input type="radio" name="cmode" value="browser"> 只用浏览器</label>
+        <label class="rad"><input type="radio" name="cmode" value="file"> 只用 cookies.txt</label>
+        <label class="rad"><input type="radio" name="cmode" value="none"> 不用 cookies</label>
+      </fieldset>
+      <div id="cookieCards" style="margin-bottom:10px"></div>
+      <div class="toolbar">
+        <button class="btn gray" id="btnDetect">🔄 重新检测</button>
+        <label class="btn gray" for="ckFileInput">📁 导入 cookies.txt…</label>
+        <input type="file" id="ckFileInput" accept=".txt" style="display:none">
+        <button class="btn gray" id="btnPasteToggle">✏️ 粘贴内容</button>
+        <button class="btn gray" id="btnUrlToggle">🔗 从 URL 拉取</button>
+      </div>
+      <div id="pasteBox" style="display:none;margin-top:8px">
+        <textarea id="pasteArea" placeholder="把 cookies.txt 的全部内容粘贴在这里（Netscape 格式，Tab 分隔）"></textarea>
+        <div style="margin-top:6px"><button class="btn" id="btnPasteSave">保存粘贴内容</button></div>
+      </div>
+      <div id="urlBox" style="display:none;margin-top:8px">
+        <input type="text" id="urlInput" style="width:520px" placeholder="https://…/cookies.txt（将下载并保存为 cookies.txt）">
+        <button class="btn" id="btnUrlSave">拉取并保存</button>
+      </div>
+      <div style="margin-top:14px"><button class="btn green" id="btnSaveCookieMode">💾 保存 cookies 设置</button></div>
+    </div>
+  </section>
+
+  <!-- ============ 日志 ============ -->
+  <section id="tab-logs" style="display:none">
+    <div class="card">
+      <div class="toolbar"><button class="btn gray" id="btnLogRefresh">🔄 刷新</button><span class="small">显示最近 400 行（同时写入 日志\网页版日志.txt）</span></div>
+      <div class="logbox" id="fullLog" style="height:460px">加载中…</div>
+    </div>
+  </section>
+
+<!-- 试看弹窗（偏移调整 / 频谱对比 / 自动对齐） -->
+<div class="modal" id="modal">
+  <div class="box wide">
+    <div class="toolbar"><b id="modalTitle">🎮 试看</b><span class="small mono" id="modalSub"></span><span class="spacer"></span><button class="btn gray btn-sm" id="modalClose">关闭 ✕</button></div>
+    <div class="preview-grid">
+      <div>
+        <video id="vplayer" controls playsinline preload="metadata"></video>
+        <div class="pv-times small mono" id="pvTimes">视频 0.000s · 谱面 0.000s</div>
+      </div>
+      <div>
+        <canvas id="chartCanvas" width="1280" height="720" style="display:none"></canvas>
+        <div id="v3dBox" style="position:relative;aspect-ratio:1/1;height:calc(94vh - 182px);width:auto;max-width:100%;margin:0 auto">
+          <iframe id="view3d" allow="autoplay" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:16px;background:#060A13;display:block;z-index:2"></iframe>
+          <iframe id="view3dPre" allow="autoplay" style="position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:16px;background:#060A13;display:block;z-index:1"></iframe>
+        </div>
+        <div id="pvGate">加载中，请稍候…</div>
+      </div>
+    </div>
+        <div class="pv-row" style="margin-top:6px;margin-bottom:4px">
+        <span class="lbl">谱面设置</span>
+        <select id="diffSel" style="min-width:130px"></select>
+        <span class="small mono" id="chartStats">—</span>
+        <span style="flex:1"></span>
+        <label class="cbtip"><input type="checkbox" id="cbSound3d" title="默认关闭：谱面声音由工具播放（左耳视频/右耳谱面）。勾上后 3D 播放器自己也会发声。">🔊 3D 自带声音</label>
+        <label class="cbtip"><input type="checkbox" id="cbVid3d" checked title="在 3D 场景里显示歌曲视频（类似游戏内效果）。">🎬 3D 视频</label>
+        <label class="cbtip" style="display:none"><input type="checkbox" id="cbChart" checked>随播放滚动</label>
+      </div>
+      <div class="pv-row" style="display:none">
+        <label class="cbtip"><input type="checkbox" id="cbHit" checked>🥁 打击音效</label>
+        <input type="range" id="volHit" min="0" max="100" value="70" style="width:90px" title="打击音量">
+        <span style="flex:1"></span>
+        <span class="lbl">帧数</span>
+        <select id="fpsSel">
+          <option value="30">30 fps</option>
+          <option value="60" selected>60 fps</option>
+          <option value="90">90 fps</option>
+          <option value="120">120 fps</option>
+          <option value="0">不限</option>
+        </select>
+        <span class="small mono" id="fpsNow"></span>
+      </div>
+        
+      <div id="specWrap" style="margin-top:10px">
+        <div class="small" style="margin-bottom:4px">频谱对比（上=视频音频 · 下=谱面音频）</div>
+        <canvas id="specCanvas" width="1400" height="280"></canvas>
+      </div>
+    
+    <div class="pv-controls">
+      <div class="pv-row">
+        <button class="btn" id="pvPlay" style="min-width:92px">▶ 播放</button>
+        <span class="lbl" style="margin-left:6px">偏移</span>
+        <button class="btn gray btn-sm" data-off="-1000">−1000</button>
+        <button class="btn gray btn-sm" data-off="-100">−100</button>
+        <button class="btn gray btn-sm" data-off="-20">−20</button>
+        <button class="btn gray btn-sm" data-off="-10">−10</button>
+        <input type="number" id="offInput" step="1" value="0">
+        <span class="lbl">ms</span>
+        <button class="btn gray btn-sm" data-off="10">+10</button>
+        <button class="btn gray btn-sm" data-off="20">+20</button>
+        <button class="btn gray btn-sm" data-off="100">+100</button>
+        <button class="btn gray btn-sm" data-off="1000">+1000</button>
+        <span style="flex:1"></span>
+        <button class="btn green" id="btnAutoSync">🪄 自动对齐</button>
+        <button class="btn" id="btnSaveOff">💾 保存偏移</button>
+      </div>
+      <div class="pv-row">
+        <label class="cbtip"><input type="checkbox" id="cbLR">🎧 左耳视频 / 右耳谱面</label>
+        <span class="lbl" style="margin-left:10px">视频音量</span>
+        <input type="range" id="volV" min="0" max="100" value="100" style="width:110px">
+        <span class="lbl" style="margin-left:10px">谱面音量</span>
+        <input type="range" id="volS" min="0" max="100" value="100" style="width:110px">
+      </div>
+      <div class="pv-row">
+        <span class="lbl">当前视频维护：</span>
+        <button class="btn gray btn-sm" id="btnStripAudio" title="删掉视频里的声音（画面保留，可省体积）">🔇 删除音频</button>
+        <button class="btn gray btn-sm" id="btnDelVideo" title="删除这首歌的视频文件和 cinema-video.json">🗑 删除视频</button>
+        <span class="small" id="pvMaintain"></span>
+      </div>
+      <div class="hint">提示：戴耳机，勾选「左耳视频 / 右耳谱面」：拍点分离就微调（±20ms 级），重合即对齐。负值=视频更晚、正值=视频更早（与游戏内 Cinema 完全一致，单位毫秒）。「🪄 自动对齐」会分析两条音轨给出建议值（首次约 5~20 秒，结果记得点💾保存）。</div>
+      <div class="pv-status" id="pvStatus"></div>
+    </div>
+    <audio id="aplayer" preload="auto" style="display:none"></audio>
+  </div>
+</div>
+
+<!-- 批量粘贴 -->
+<div class="modal" id="batchModal">
+  <div class="box">
+    <div class="toolbar"><b>批量粘贴链接</b><span class="spacer"></span><button class="btn gray btn-sm" id="batchClose">关闭 ✕</button></div>
+    <div class="hint" style="margin-bottom:8px">每行一条，支持两种格式：<span class="mono">序号 | 链接</span> 或 <span class="mono">文件夹名 | 链接</span>（也可用空格分隔）。示例：<span class="mono">10 | https://www.youtube.com/watch?v=Z21UcyNdXSQ</span></div>
+    <textarea id="batchArea" placeholder="10 | https://youtu.be/xxxx&#10;14 | https://www.youtube.com/watch?v=yyyy"></textarea>
+    <div style="margin-top:8px"><button class="btn green" id="batchSave">解析并保存</button> <span class="small" id="batchResult"></span></div>
+  </div>
+</div>
+
+
+<!-- 音频查重 -->
+<div class="modal" id="dupModal">
+  <div class="box wide">
+    <div class="toolbar"><b>🔍 查重（按文件夹 ID）</b><span class="small" id="dupSummary"></span><span class="spacer"></span><button class="btn gray btn-sm" id="dupRescan">🔄 重新分析</button><button class="btn gray btn-sm" id="dupClose">关闭 ✕</button></div>
+    <div class="hint" style="margin-bottom:6px">按「文件夹名开头的 ID」查重：如 <span class="mono">10af0 (mousou zei - Dack)</span> 的 ID 是 <span class="mono">10af0</span>。同一 ID 的多个文件夹即为重复谱面（不使用音频分析，秒出）。</div>
+    <div id="dupBody" style="max-height:58vh;overflow:auto"></div>
+  </div>
+</div>
+
+<!-- 试听（无视频时用来确认是哪首歌） -->
+<div class="modal" id="ldModal">
+  <div class="box">
+    <div class="toolbar"><b id="ldTitle">🎧 试听</b><span class="small mono" id="ldSub"></span><span class="spacer"></span><button class="btn gray btn-sm" id="ldClose">关闭 ✕</button></div>
+    <div class="hint" id="ldHint">这首歌还没有视频，先听一下确认是哪一首（不会改动任何文件）。</div>
+    <audio id="ldPlayer" controls preload="auto" style="width:100%;margin-top:8px"></audio>
+    <div class="small mono" id="ldStatus" style="margin-top:6px"></div>
+  </div>
+</div>
+
+<!-- 播放列表：管理/编辑 -->
+<div class="modal" id="plEditModal" style="z-index:45">
+  <div class="box wide">
+    <div class="toolbar"><b id="plEditTitle">📚 播放列表</b><span class="small mono" id="plEditSub"></span><span class="spacer"></span><button class="btn gray btn-sm" id="plEditFolder">📂 目录</button><button class="btn gray btn-sm" id="plEditClose">关闭 ✕</button></div>
+    <div class="rowsep">
+      <label class="small">标题</label><input type="text" id="plTitle">
+      <label class="small">作者</label><input type="text" id="plAuthor" placeholder="（可留空）">
+      <label class="small">描述</label><input type="text" id="plDesc" placeholder="（可留空）">
+    </div>
+    <div class="toolbar" style="margin-top:10px">
+      <button class="btn" id="plAddSongs">＋ 添加歌曲…</button>
+      <button class="btn gray" id="plDlMissing">⬇ 下载全部缺失</button>
+      <button class="btn gray" id="plCleanMissing">🧹 移除「本地没有」的条目</button>
+      <span class="spacer"></span>
+      <span class="small" id="plEditStat">—</span>
+      <button class="btn green" id="plSave">💾 保存</button>
+    </div>
+    <div id="plSongs"></div>
+    <div class="small mono" id="plDlStatus" style="margin-top:6px"></div>
+    <div class="hint">↑↓ 调整顺序 · ✕ 移除条目 · ⬇ 从 BeatSaver 下载「本地没有」的谱面（单个或一键全部）。改动要先点「💾 保存」才会写入 .bplist（保存前自动备份）。下载后需在游戏里刷新歌曲（或重启游戏）才会出现。</div>
+  </div>
+</div>
+
+<!-- 播放列表：新建 -->
+<div class="modal" id="plNewModal" style="z-index:45">
+  <div class="box">
+    <div class="toolbar"><b>＋ 新建播放列表</b><span class="spacer"></span><button class="btn gray btn-sm" id="plNewClose">关闭 ✕</button></div>
+    <div class="rowsep">
+      <label class="small">标题</label><input type="text" id="plNewTitle" placeholder="例如：无视频待补歌单">
+      <label class="small">作者</label><input type="text" id="plNewAuthor" placeholder="（可留空）">
+      <label class="small">描述</label><input type="text" id="plNewDesc" placeholder="（可留空）">
+    </div>
+    <div class="toolbar" style="margin-top:10px">
+      <button class="btn gray" id="plNewPick">＋ 选择歌曲…</button>
+      <span class="small" id="plNewStat">已选 0 首</span>
+      <span class="spacer"></span>
+      <button class="btn green" id="plNewOk">创建</button>
+    </div>
+    <div class="hint">也可以先在「歌曲」页勾选若干首，再点工具栏的「＋ 加入播放列表」。</div>
+  </div>
+</div>
+
+<!-- 播放列表：选歌器 -->
+<div class="modal" id="plPickModal" style="z-index:60">
+  <div class="box wide">
+    <div class="toolbar"><b>选择歌曲</b><span class="spacer"></span>
+      <input type="text" id="plPickSearch" placeholder="搜索歌名 / 文件夹 / 作者" style="min-width:230px">
+      <select id="plPickFilter"><option value="all">全部</option><option value="novid">无视频</option><option value="vid">有视频</option></select>
+      <button class="btn gray btn-sm" id="plPickAll">➕ 全选筛选结果</button>
+      <button class="btn gray btn-sm" id="plPickNone">全不选</button>
+      <button class="btn gray btn-sm" id="plPickClose">关闭 ✕</button></div>
+    <div id="plPickBody"></div>
+    <div class="toolbar" style="margin-top:8px"><span class="small" id="plPickStat">—</span><span class="spacer"></span><button class="btn green" id="plPickOk">确定</button></div>
+  </div>
+</div>
+
+<!-- 播放列表：把勾选的歌曲加入已有歌单 -->
+<div class="modal" id="plAddModal" style="z-index:45">
+  <div class="box">
+    <div class="toolbar"><b>＋ 加入播放列表</b><span class="spacer"></span><button class="btn gray btn-sm" id="plAddClose">关闭 ✕</button></div>
+    <div class="hint" id="plAddInfo"></div>
+    <div class="rowsep" style="margin-top:8px">
+      <label class="small">目标歌单</label>
+      <div style="display:flex;gap:8px;align-items:center"><select id="plAddTarget" style="min-width:260px"></select><button class="btn green" id="plAddOk">加入</button><button class="btn gray" id="plAddNew">＋ 新建并加入…</button></div>
+    </div>
+  </div>
+</div>
+
+  <!-- ============ 无缝挑战 ============ -->
+  <section id="tab-challenges" style="display:none">
+    <div class="card">
+      <div class="toolbar">
+        <button class="btn gray" id="btnChRefresh">🔄 刷新</button>
+        <button class="btn" id="btnChNew">＋ 新建挑战</button>
+        <button class="btn gray" id="btnChSettings">⚙️ 游戏内设置</button>
+        <button class="btn gray" id="btnChFolder">📂 打开目录</button>
+        <span class="spacer"></span>
+        <span class="small" id="chSummary">加载中…</span>
+      </div>
+      <div style="overflow-x:auto">
+        <table>
+          <thead><tr><th>标题</th><th style="width:90px">模式</th><th style="width:70px">歌曲</th><th style="width:96px">总时长</th><th style="width:110px">失败行为</th><th style="width:140px">文件</th><th style="width:170px">操作</th></tr></thead>
+          <tbody id="chBody"><tr><td colspan="7" class="small">加载中…</td></tr></tbody>
+        </table>
+      </div>
+      <div class="hint">挑战存在游戏的 <span class="mono">UserData\SetlistChallenge\</span>（游戏内 mod 读取）。<span class="mono">setlist</span>=按排好的顺序连打；<span class="mono">random</span>=按筛选随机。失败行为/跳过结算也能在游戏内改（游戏内优先）。</div>
+    </div>
+  </section>
+</div>
+
+  <!-- 无缝挑战：编辑 -->
+  <div class="modal" id="chEditModal" style="z-index:45">
+    <div class="box wide">
+      <div class="toolbar"><b id="chEditTitle">🎬 编辑挑战</b><span class="small mono" id="chEditSub"></span><span class="spacer"></span><button class="btn gray btn-sm" id="chEditFolder">📂</button><button class="btn gray btn-sm" id="chEditClose">关闭 ✕</button></div>
+      <div class="rowsep">
+        <label class="small">标题</label><input type="text" id="chTitle">
+        <label class="small">模式</label><div><select id="chMode"><option value="setlist">setlist · 固定顺序连打</option><option value="random">random · 按筛选随机</option></select></div>
+        <label class="small">失败行为</label><div><select id="chFail"><option value="">跟随游戏内设置</option><option value="false">不结束（NoFail 式，倒下继续）</option><option value="true">失败即结束整场</option></select></div>
+        <label class="small">跳过结算</label><div><select id="chSkip"><option value="">跟随游戏内设置</option><option value="true">跳过（无缝连打）</option><option value="false">正常显示结算</option></select></div>
+        <label class="small">打乱顺序</label><div><label class="cbtip"><input type="checkbox" id="chShuffle">随机播放已选歌曲</label></div>
+      </div>
+      <div id="chSetlistWrap">
+        <div class="toolbar" style="margin-top:10px">
+          <button class="btn" id="chAddSongs">＋ 添加歌曲…</button>
+          <button class="btn gray" id="chImportPl">📚 从歌单导入…</button>
+          <span class="spacer"></span>
+          <span class="small" id="chStat">—</span>
+          <button class="btn green" id="chSave">💾 保存</button>
+        </div>
+        <div id="chSongs"></div>
+      </div>
+      <div id="chRandomWrap" style="display:none">
+        <div class="rowsep" style="margin-top:10px">
+          <label class="small">难度</label><div><select id="chFDiff"></select></div>
+          <label class="small">抽歌数量</label><input type="number" id="chFCount" value="10" min="1">
+          <label class="small">按时长(分钟，0=按数量)</label><input type="number" id="chFDur" value="0" min="0">
+          <label class="small">NPS 范围</label><div><input type="number" id="chFMinNps" step="0.1" placeholder="最低" style="width:80px"> ~ <input type="number" id="chFMaxNps" step="0.1" placeholder="最高" style="width:80px"></div>
+          <label class="small">只要特殊谱面</label><div><label class="cbtip"><input type="checkbox" id="chFNoodle">Noodle</label> <label class="cbtip"><input type="checkbox" id="chFChroma">Chroma</label></div>
+          <label class="small">限定歌单</label><input type="text" id="chFPlaylist" placeholder="留空=全部（.bplist 文件名）">
+        </div>
+        <div class="toolbar" style="margin-top:10px"><span class="spacer"></span><button class="btn green" id="chSave2">💾 保存</button></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 无缝挑战：新建 -->
+  <div class="modal" id="chNewModal" style="z-index:45">
+    <div class="box">
+      <div class="toolbar"><b>＋ 新建挑战</b><span class="spacer"></span><button class="btn gray btn-sm" id="chNewClose">关闭 ✕</button></div>
+      <div class="rowsep">
+        <label class="small">标题</label><input type="text" id="chNewTitle" placeholder="例如：周末连打">
+        <label class="small">模式</label><div><select id="chNewMode"><option value="setlist">setlist · 固定顺序</option><option value="random">random · 随机</option></select></div>
+      </div>
+      <div class="toolbar" style="margin-top:10px"><span class="small" id="chNewStat">已选 0 首（random 模式可跳过）</span><span class="spacer"></span><button class="btn gray" id="chNewPick">＋ 选择歌曲…</button><button class="btn green" id="chNewOk">创建</button></div>
+    </div>
+  </div>
+
+  <!-- 无缝挑战：从播放列表导入 -->
+  <div class="modal" id="chPlModal" style="z-index:45">
+    <div class="box">
+      <div class="toolbar"><b>📚 从播放列表导入</b><span class="spacer"></span><button class="btn gray btn-sm" id="chPlClose">关闭 ✕</button></div>
+      <div class="rowsep" style="margin-top:8px">
+        <label class="small">播放列表</label><div><select id="chPlSel" style="min-width:300px"></select></div>
+        <label class="small">导入的难度</label><div><select id="chPlDiff" style="min-width:130px"></select></div>
+      </div>
+      <div class="toolbar" style="margin-top:10px">
+        <span class="small" id="chPlStat">—</span><span class="spacer"></span>
+        <button class="btn green" id="chPlOk">导入</button>
+      </div>
+      <div class="hint">歌单里「本地有」的歌会按原顺序加入挑战；未下载的自动跳过、重复的自动去重。</div>
+    </div>
+  </div>
+
+  <!-- 无缝挑战：游戏内设置 -->
+  <div class="modal" id="chSetModal" style="z-index:45">
+    <div class="box">
+      <div class="toolbar"><b>⚙️ 游戏内设置</b><span class="spacer"></span><button class="btn gray btn-sm" id="chSetClose">关闭 ✕</button></div>
+      <div class="hint">写到 <span class="mono">UserData\SetlistChallenge\settings.json</span>（游戏内 mod 读取，游戏内也能改）</div>
+      <div class="rowsep" style="margin-top:8px">
+        <label class="small">失败即结束</label><div><label class="cbtip"><input type="checkbox" id="stFail">开启后失败=整场结束（关闭=NoFail 式）</label></div>
+        <label class="small">跳过结算</label><div><label class="cbtip"><input type="checkbox" id="stSkip">换谱时跳过结算界面</label></div>
+        <label class="small">进度 HUD</label><div><label class="cbtip"><input type="checkbox" id="stHud">显示「第 N/M 首」</label></div>
+        <label class="small">换谱反应时间</label><input type="number" id="stReact" min="100" step="50">
+        <label class="small">换谱宽限(无敌)</label><input type="number" id="stGrace" min="0" step="100">
+      </div>
+      <div class="toolbar" style="margin-top:10px"><span class="small" id="stStat"></span><span class="spacer"></span><button class="btn green" id="stSave">💾 保存设置</button></div>
+    </div>
+  </div>
+
+<!-- 本地视频文件选择器 -->
+<input type="file" id="localVideoInput" accept=".mp4,.webm,.mkv,.mov,.m4v,.avi" style="display:none">
+<div id="toasts"></div>
+
+<script>
+"use strict";
+/* ---------------- 基础 ---------------- */
+var $ = function(id){ return document.getElementById(id); };
+function esc(s){
+  return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDur(sec){
+  sec = Math.round(Number(sec) || 0);
+  if (sec <= 0) return '—';
+  var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  var p = function(n){ return n < 10 ? ('0' + n) : ('' + n); };
+  return (h > 0 ? (h + ':' + p(m)) : m) + ':' + p(s);
+}
+function fmtDurLong(sec){
+  sec = Math.round(Number(sec) || 0);
+  if (sec <= 0) return '—';
+  var h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = sec % 60;
+  return (h > 0 ? (h + ' 小时 ') : '') + m + ' 分 ' + s + ' 秒';
+}
+function fillDurations(list){
+  var need = [];
+  (list || []).forEach(function(e){ if (e && e.folder && !e.durSec) need.push(e.folder); });
+  if (!need.length) return Promise.resolve();
+  return api('/api/durations?folders=' + encodeURIComponent(need.join('|'))).then(function(j){
+    var map = (j && j.durations) || {};
+    (list || []).forEach(function(e){ if (e && e.folder && !e.durSec) e.durSec = map[e.folder] || 0; });
+  }).catch(function(){});
+}
+function toast(msg, type){
+  var d = document.createElement('div');
+  d.className = 'toast ' + (type||'');
+  d.textContent = msg;
+  $('toasts').appendChild(d);
+  setTimeout(function(){ try{ d.remove(); }catch(e){} }, 4200);
+}
+function api(path, method, body){
+  return fetch(path, {
+    method: method || 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: body ? JSON.stringify(body) : undefined
+  }).then(function(r){ return r.json().catch(function(){ return {}; }); })
+    .then(function(j){ if (j && j.error) throw new Error(j.error); return j; });
+}
+
+/* ---------------- 全局状态 ---------------- */
+var S = { songs: [], filter: 'all', cfg: null, cookies: null, jobs: null, lastRunning: false, detectTimer: null, pollCount: 0 };
+
+/* ---------------- Tab ---------------- */
+document.querySelectorAll('nav button').forEach(function(b){
+  b.addEventListener('click', function(){
+    document.querySelectorAll('nav button').forEach(function(x){ x.classList.remove('on'); });
+    b.classList.add('on');
+    ['songs','playlists','challenges','downloads','settings','logs'].forEach(function(t){
+      $('tab-' + t).style.display = (t === b.dataset.tab) ? '' : 'none';
+    });
+    if (b.dataset.tab === 'logs') refreshLogs();
+    if (b.dataset.tab === 'settings') renderSettings();
+    if (b.dataset.tab === 'playlists') loadPlaylists();
+    if (b.dataset.tab === 'challenges') loadChallenges();
+  });
+});
+
+/* ---------------- 状态 chips ---------------- */
+function refreshState(cb){
+  return api('/api/state').then(function(st){
+    S.cfg = st.config; S.cookies = st.cookies; S.jobs = st.jobs;
+    $('chipVer').textContent = st.version;
+    var c = $('chipCookies');
+    var eff = st.cookies && st.cookies.effective;
+    if (st.cookies && st.cookies.running){ c.innerHTML = '<span class="dot warn"></span>cookies: <b>检测中…</b>'; }
+    else if (eff){ c.innerHTML = '<span class="dot ok"></span>cookies: <b>' + esc(eff.label) + '</b>'; }
+    else { c.innerHTML = '<span class="dot bad"></span>cookies: <b>无可用来源</b>'; }
+    var p = $('chipProxy');
+    var url = st.config['代理'] || '';
+    var label = url ? ((url.indexOf('7890') >= 0 ? '本机 Clash' : url.replace(/\/\/.*@/, '//***@'))) : '直连';
+    p.innerHTML = '<span class="dot ' + (url ? 'ok' : 'warn') + '"></span>代理: <b>' + esc(label) + '</b>';
+    $('chipProxy').title = url || '直连';
+    if (cb) cb(st);
+  }).catch(function(){});
+}
+
+/* ---------------- 歌曲列表 ---------------- */
+function statusBadge(s){
+  if (s === '已下载') return '<span class="badge b-done">已下载</span>';
+  if (s === '待下载(已有链接)') return '<span class="badge b-pend">待下载·有链接</span>';
+  if (s === '待下载(无链接)') return '<span class="badge b-pend2">待下载·无链接</span>';
+  return '<span class="badge b-need">需添加链接</span>';
+}
+function loadSongs(){
+  return api('/api/songs').then(function(j){
+    S.songs = j.rows || [];
+    renderSongs();
+  });
+}
+/* 排序：无视频排最上面；其次 0ms 偏移（有视频但偏移为 0）；其余按歌曲名首字母 */
+var _coll = (function(){ try { return new Intl.Collator('zh-Hans-CN', { numeric: true, sensitivity: 'base' }); } catch(e){ return null; } })();
+function songSortTitle(r){
+  var n = (r.name || '').trim();
+  if (!n) {                                                          // 名字为空时从文件夹 "ID (歌名 - 作者)" 提取
+    var m = String(r.folder || '').match(/\((.+?)\s+-\s+[^)]*\)\s*$/);
+    n = m ? m[1].trim() : String(r.folder || '');
+  }
+  return n;
+}
+function songSortKey(s){                                             // 去掉前导标点/符号，取首个有意义字符起
+  s = String(s || '');
+  var m = s.match(/[0-9A-Za-z\u3041-\u30ff\u4e00-\u9fff]/);
+  return m ? s.slice(s.indexOf(m[0])) : s;
+}
+function songSortBucket(t){ var c = (t || '').charAt(0); return (c >= '0' && c <= '9') ? 0 : (((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) ? 1 : 2); }
+function songTier(r){                                                 // 0=无视频；1=有视频且偏移为0；2=有视频且偏移非0
+  if (!r.hasVideo) return 0;
+  var o = (r.offset === null || r.offset === undefined) ? 0 : Number(r.offset);
+  return (o === 0) ? 1 : 2;
+}
+function cmpSongRows(a, b){
+  var ta = songTier(a), tb = songTier(b);
+  if (ta !== tb) return ta - tb;                                     // 第1档无视频 → 第2档0ms偏移 → 第3档其余
+  var A = songSortKey(songSortTitle(a)), B = songSortKey(songSortTitle(b));
+  var ba = songSortBucket(A), bb = songSortBucket(B);
+  if (ba !== bb) return ba - bb;                                     // 数字 → 字母 → 其它
+  var c = _coll ? _coll.compare(A, B) : (A < B ? -1 : A > B ? 1 : 0);
+  if (c) return c;
+  var fa = String(a.folder || ''), fb = String(b.folder || '');
+  return _coll ? _coll.compare(fa, fb) : (fa < fb ? -1 : fa > fb ? 1 : 0);
+}
+function renderSongs(){
+  var flt = S.filter;
+  var all = S.songs.slice().sort(cmpSongRows);
+  all.forEach(function(r, i){ r._idx = i + 1; });                    // 序号按当前排序位置重排
+  var rows = all.filter(function(r){
+    if (flt === 'all') return true;
+    if (flt === 'need') return r.status === '需添加链接' || r.status === '待下载(无链接)';
+    if (flt === 'pend') return r.status.indexOf('待下载') === 0;
+    if (flt === 'done') return r.status === '已下载';
+    return true;
+  });
+  var html = '';
+  rows.forEach(function(r){
+    html += '<tr>'
+      + '<td><input type="checkbox" class="songchk" data-folder="' + esc(r.folder) + '"></td>'
+      + '<td class="small">' + r._idx + '</td>'
+      + '<td><div>' + esc(r.name) + '</div><div class="small mono">' + esc(r.folder) + (r.artist ? (' · ' + esc(r.artist)) : '') + '</div></td>'
+      + '<td>' + statusBadge(r.status) + (r.videoInfo ? '<div class="small mono">' + esc(r.videoInfo) + '</div>' : '') + '</td>'
+      + '<td class="small mono" title="歌曲音频时长">' + fmtDur(r.durSec) + '</td>'
+      + '<td><div style="display:flex;gap:6px"><input type="text" class="linkinput" data-folder="' + esc(r.folder) + '" value="' + esc(r.link || '') + '" placeholder="填入 YouTube 链接">'
+      + '<button class="btn btn-sm" data-act="savelink" data-folder="' + esc(r.folder) + '">保存</button></div></td>'
+      + '<td>' + ((r.hasConfig || r.status === '已下载')
+          ? '<div style="display:flex;gap:8px;align-items:center">'
+            + (r.hasConfig
+                ? '<span class="mono" style="min-width:52px;text-align:right;color:' + (r.offset ? 'var(--cyan)' : 'var(--dim)') + '">' + (r.offset == null ? 0 : r.offset) + '</span><span class="small">ms</span>'
+                : '<span class="small">无配置</span>')
+            + (r.status === '已下载'
+                ? '<button class="btn btn-sm gray" data-act="preview" data-folder="' + esc(r.folder) + '" data-name="' + esc(r.name) + '" title="3D 试看 / 偏移对齐">🎮 试看</button>'
+                : '<button class="btn btn-sm gray" data-act="listen" data-folder="' + esc(r.folder) + '" data-name="' + esc(r.name) + '" data-artist="' + esc(r.artist || '') + '">🎧 试听</button>')
+            + '</div>'
+          : (r.status === '需添加链接' || r.status === '待下载(无链接)'
+              ? '<button class="btn btn-sm gray" data-act="listen" data-folder="' + esc(r.folder) + '" data-name="' + esc(r.name) + '" data-artist="' + esc(r.artist || '') + '">🎧 试听</button>'
+              : '<span class="small">—</span>'))
+      + '</td>'
+      + '<td><button class="btn btn-sm" data-act="download" data-folder="' + esc(r.folder) + '">下载</button> '
+      + (r.status === '已下载' ? '<button class="btn btn-sm gray" data-act="redownload" data-folder="' + esc(r.folder) + '">重下</button> ' : '')
+      + '<button class="btn btn-sm gray" data-act="uselocal" data-folder="' + esc(r.folder) + '">📁本地</button> '
+      + '<button class="btn btn-sm gray" data-act="folder" data-folder="' + esc(r.folder) + '">📂</button></td>'
+      + '</tr>';
+  });
+  $('songsBody').innerHTML = html || '<tr><td colspan="8" class="small">（无匹配歌曲）</td></tr>';
+  var done = S.songs.filter(function(r){ return r.status === '已下载'; }).length;
+  var pend = S.songs.filter(function(r){ return r.status.indexOf('待下载') === 0; }).length;
+  var need = S.songs.filter(function(r){ return r.status === '需添加链接' || r.status === '待下载(无链接)'; }).length;
+  $('summary').textContent = '共 ' + S.songs.length + ' 首：已下载 ' + done + ' · 待下载 ' + pend + ' · 需补链接 ' + need;
+}
+$('flt').addEventListener('change', function(){ S.filter = this.value; renderSongs(); });
+$('btnScan').addEventListener('click', function(){ loadSongs().then(function(){ toast('已重新扫描', 'ok'); }); });
+
+/* 事件代理 */
+document.addEventListener('click', function(ev){
+  var el = ev.target.closest ? ev.target.closest('[data-act]') : null;
+  if (!el) return;
+  var act = el.dataset.act, folder = el.dataset.folder;
+  if (act === 'savelink'){
+    var inp = el.closest('td').querySelector('.linkinput');
+    api('/api/link', 'POST', { folder: folder, url: inp.value.trim() })
+      .then(function(){ toast('已保存链接：' + folder, 'ok'); loadSongs(); })
+      .catch(function(e){ toast('保存失败：' + e.message, 'err'); });
+  } else if (act === 'download'){
+    doDownload([folder], false);
+  } else if (act === 'redownload'){
+    doDownload([folder], true);
+  } else if (act === 'uselocal'){
+    var inp = $('localVideoInput');
+    inp.dataset.folder = folder;
+    inp.value = '';
+    inp.click();
+  } else if (act === 'folder'){
+    api('/api/openfolder?folder=' + encodeURIComponent(folder)).catch(function(e){ toast(e.message, 'err'); });
+  } else if (act === 'preview'){
+    pvOpen(folder);
+  } else if (act === 'view3d'){
+    open3d(folder);
+  } else if (act === 'listen'){
+    ldOpen(folder, el.dataset.name || folder, el.dataset.artist || '');
+  } else if (act === 'delsong'){
+    if (!confirm('把这首歌移出？\n' + folder + '\n（移到 CustomLevels_已删除，可从那里恢复）')) return;
+    api('/api/deletesong', 'POST', { folder: folder })
+      .then(function(){ toast('已移出：' + folder, 'ok'); loadSongs(); if ($('dupModal').classList.contains('on')) dupStart(); })
+      .catch(function(e){ toast('移出失败：' + e.message, 'err'); });
+  } else if (act === 'dupkeep'){
+    var gi = parseInt(el.dataset.group, 10);
+    var grp = (DUP.last && DUP.last.groups) ? DUP.last.groups[gi] : null;
+    if (!grp || grp.members.length < 2) return;
+    var keep = grp.members[0], rest = grp.members.slice(1);
+    if (!confirm('保留「' + keep.name + '」(' + keep.folder + ')\n移出其余 ' + rest.length + ' 首？\n' + rest.map(function(m){ return '· ' + m.folder; }).join('\n'))) return;
+    var chain = Promise.resolve();
+    rest.forEach(function(m){ chain = chain.then(function(){ return api('/api/deletesong', 'POST', { folder: m.folder }); }); });
+    chain.then(function(){ toast('已移出 ' + rest.length + ' 首', 'ok'); loadSongs(); dupStart(); })
+         .catch(function(e){ toast('移出失败：' + e.message, 'err'); loadSongs(); dupStart(); });
+  }
+});
+$('modalClose').addEventListener('click', pvClose);
+$('modal').addEventListener('click', function(e){ if (e.target === this) pvClose(); });
+
+/* ---------------- 下载 ---------------- */
+function doDownload(folders, force){
+  api('/api/download', 'POST', { folders: folders, force: force })
+    .then(function(j){ toast('已开始下载任务（' + j.count + ' 首）', 'ok'); showTabByName('downloads'); })
+    .catch(function(e){ toast('无法开始：' + e.message, 'err'); });
+}
+$('btnDlAll').addEventListener('click', function(){ doDownload(null, false); });
+$('btnStop').addEventListener('click', function(){
+  api('/api/stop', 'POST', {}).then(function(){ toast('正在停止…', 'warn'); }).catch(function(e){ toast(e.message, 'err'); });
+});
+function showTabByName(t){
+  var navs = document.querySelectorAll('nav button');
+  navs.forEach(function(b){ if (b.dataset.tab === t) b.click(); });
+}
+function pollJobs(){
+  api('/api/jobs?tail=260').then(function(j){
+    S.jobs = j;
+    var running = j.running;
+    if (j.current){
+      var cur = j.current;
+      $('jobCurrent').innerHTML = '正在处理：<b>' + esc(cur.name) + '</b> <span class="small mono">(' + esc(cur.folder) + ')</span> — ' + esc(cur.status || '') + ' ' + (cur.pct ? (cur.pct + '%') : '');
+      $('jobBar').style.width = (cur.pct || 0) + '%';
+    } else if (running) {
+      $('jobCurrent').textContent = '准备中…';
+    } else {
+      $('jobCurrent').textContent = '没有进行中的任务';
+      if (j.stats && (j.stats.ok || j.stats.fail || j.stats.skip)) {
+        $('jobCurrent').textContent = '最近任务已结束（成功 ' + j.stats.ok + ' / 跳过 ' + j.stats.skip + ' / 失败 ' + j.stats.fail + '）';
+      }
+      $('jobBar').style.width = '0%';
+    }
+    $('jobStats').textContent = j.stats ? ('成功 ' + j.stats.ok + ' · 跳过 ' + j.stats.skip + ' · 失败 ' + j.stats.fail + (j.queue && j.queue.length ? (' · 队列剩 ' + j.queue.length) : '')) : '';
+    var rh = '';
+    (j.results || []).slice().reverse().forEach(function(r){
+      var col = r.status === 'ok' ? 'var(--ok)' : (r.status === 'skip' ? 'var(--warn)' : 'var(--err)');
+      rh += '<div style="padding:3px 0">' + '<span style="color:' + col + '">' + (r.status === 'ok' ? '✔' : (r.status === 'skip' ? '⏭' : '✘')) + '</span> '
+        + esc(r.name) + ' <span class="small mono">' + esc(r.detail || '') + '</span></div>';
+    });
+    $('jobResults').innerHTML = rh || '—';
+    $('jobLog').textContent = (j.log || []).join('\n') || '（暂无）';
+    $('jobLog').scrollTop = $('jobLog').scrollHeight;
+    if (S.lastRunning && !running){ loadSongs(); toast('下载任务结束', 'ok'); }
+    S.lastRunning = running;
+  }).catch(function(){});
+}
+
+/* ---------------- 设置 ---------------- */
+function renderSettings(){
+  if (!S.cfg) return;
+  var pm = S.cfg['代理模式'] || 'local';
+  document.querySelectorAll('input[name=pmode]').forEach(function(r){ r.checked = (r.value === pm); });
+  $('customProxy').value = S.cfg['自定义代理'] || '';
+  $('heightSel').value = String(S.cfg['视频高度'] || 1080);
+  var cm = S.cfg['cookie来源'] || 'auto';
+  document.querySelectorAll('input[name=cmode]').forEach(function(r){ r.checked = (r.value === cm); });
+  renderCookieCards();
+}
+function renderCookieCards(){
+  var c = S.cookies || {};
+  var html = '';
+  var browsers = c.browsers || [];
+  browsers.forEach(function(b){
+    var dot = b.status === 'ok' ? 'ok' : (b.status === 'fail' ? 'bad' : 'warn');
+    html += '<div class="cookie-row"><span class="nm">' + esc(b.label) + '</span><span class="dot ' + dot + '" style="width:9px;height:9px;border-radius:50%;display:inline-block;background:' + (b.status === 'ok' ? 'var(--ok)' : (b.status === 'fail' ? 'var(--err)' : 'var(--dim)')) + '"></span><span class="kot">' + esc(b.detail) + '</span></div>';
+  });
+  if (c.file){
+    var dot2 = c.file.status === 'ok' ? 'ok' : (c.file.status === 'fail' ? 'bad' : 'warn');
+    html += '<div class="cookie-row"><span class="nm">cookies.txt</span><span style="width:9px;height:9px;border-radius:50%;display:inline-block;background:' + (c.file.status === 'ok' ? 'var(--ok)' : (c.file.status === 'fail' ? 'var(--err)' : 'var(--dim)')) + '"></span><span class="kot">' + esc(c.file.detail) + '</span></div>';
+  }
+  if (c.running) html += '<div class="small" style="margin-top:6px">检测中…（每个来源约需几秒）</div>';
+  var eff = c.effective;
+  html += '<div class="small" style="margin-top:8px">当前生效来源：<b>' + (eff ? esc(eff.label) : '（无）') + '</b></div>';
+  $('cookieCards').innerHTML = html;
+}
+function currentProxyFromForm(){
+  var pm = 'local';
+  document.querySelectorAll('input[name=pmode]').forEach(function(r){ if (r.checked) pm = r.value; });
+  return { '代理模式': pm, '自定义代理': $('customProxy').value.trim() };
+}
+$('btnTestProxy').addEventListener('click', function(){
+  var p = currentProxyFromForm();
+  $('proxyTestResult').textContent = '测试中…';
+  api('/api/proxy/test', 'POST', p).then(function(r){
+    if (r.ok){ $('proxyTestResult').innerHTML = '<span style="color:var(--ok)">✔ ' + esc(r.detail) + '</span>'; }
+    else { $('proxyTestResult').innerHTML = '<span style="color:var(--err)">✘ ' + esc(r.detail) + '</span>'; }
+  }).catch(function(e){ $('proxyTestResult').textContent = '✘ ' + e.message; });
+});
+$('btnSaveSettings').addEventListener('click', function(){
+  var p = currentProxyFromForm();
+  api('/api/settings', 'POST', { '代理模式': p['代理模式'], '自定义代理': p['自定义代理'], '视频高度': $('heightSel').value })
+    .then(function(){ toast('设置已保存', 'ok'); refreshState(); })
+    .catch(function(e){ toast('保存失败：' + e.message, 'err'); });
+});
+$('btnDetect').addEventListener('click', function(){
+  api('/api/cookies/detect', 'POST', {}).then(function(){ toast('开始检测 cookies…', ''); startDetectPolling(); });
+});
+$('btnSaveCookieMode').addEventListener('click', function(){
+  var cm = 'auto';
+  document.querySelectorAll('input[name=cmode]').forEach(function(r){ if (r.checked) cm = r.value; });
+  api('/api/settings', 'POST', { 'cookie来源': cm }).then(function(){ toast('cookies 设置已保存', 'ok'); refreshState(); });
+});
+function startDetectPolling(){
+  if (S.detectTimer) clearInterval(S.detectTimer);
+  S.detectTimer = setInterval(function(){
+    refreshState(function(st){
+      renderCookieCards();
+      if (!st.cookies || !st.cookies.running){ clearInterval(S.detectTimer); S.detectTimer = null; }
+    });
+  }, 2500);
+  refreshState(function(){ renderCookieCards(); });
+}
+$('ckFileInput').addEventListener('change', function(){
+  var f = this.files && this.files[0];
+  if (!f) return;
+  var fr = new FileReader();
+  fr.onload = function(){
+    api('/api/cookies/import', 'POST', { content: String(fr.result) })
+      .then(function(){ toast('已导入 cookies.txt 并开始检测', 'ok'); startDetectPolling(); })
+      .catch(function(e){ toast('导入失败：' + e.message, 'err'); });
+  };
+  fr.readAsText(f);
+  this.value = '';
+});
+$('btnPasteToggle').addEventListener('click', function(){ var b = $('pasteBox'); b.style.display = (b.style.display === 'none') ? '' : 'none'; });
+$('btnUrlToggle').addEventListener('click', function(){ var b = $('urlBox'); b.style.display = (b.style.display === 'none') ? '' : 'none'; });
+$('btnPasteSave').addEventListener('click', function(){
+  var v = $('pasteArea').value;
+  if (!v.trim()){ toast('内容为空', 'warn'); return; }
+  api('/api/cookies/import', 'POST', { content: v })
+    .then(function(){ toast('已保存并开始检测', 'ok'); $('pasteBox').style.display = 'none'; startDetectPolling(); })
+    .catch(function(e){ toast('保存失败：' + e.message, 'err'); });
+});
+$('btnUrlSave').addEventListener('click', function(){
+  var u = $('urlInput').value.trim();
+  if (!u){ toast('请输入 URL', 'warn'); return; }
+  api('/api/cookies/fetchurl', 'POST', { url: u })
+    .then(function(){ toast('拉取成功，开始检测', 'ok'); $('urlBox').style.display = 'none'; startDetectPolling(); })
+    .catch(function(e){ toast('拉取失败：' + e.message, 'err'); });
+});
+
+/* ---------------- 日志 ---------------- */
+function refreshLogs(){
+  api('/api/jobs?tail=400').then(function(j){ $('fullLog').textContent = (j.log || []).join('\n') || '（暂无）'; });
+}
+$('btnLogRefresh').addEventListener('click', refreshLogs);
+
+/* ---------------- 批量粘贴 ---------------- */
+$('btnBatch').addEventListener('click', function(){ $('batchModal').classList.add('on'); });
+$('batchClose').addEventListener('click', function(){ $('batchModal').classList.remove('on'); });
+$('batchSave').addEventListener('click', function(){
+  var lines = $('batchArea').value.split('\n');
+  var jobs = [];
+  lines.forEach(function(line){
+    line = line.trim();
+    if (!line || line.indexOf('#') === 0) return;
+    var parts = line.split(/\s*[|｜]\s*|\s{1,}/);
+    if (parts.length < 2) return;
+    var key = parts[0].trim(); var url = parts[1].trim();
+    if (!/^https?:|^[A-Za-z0-9_\-]{11}$/.test(url)) return;
+    var folder = null;
+    if (/^\d+$/.test(key)){
+      var r = S.songs.filter(function(x){ return String(x._idx === undefined ? x.idx : x._idx) === key; })[0];
+      if (r) folder = r.folder;
+    } else {
+      var r2 = S.songs.filter(function(x){ return x.folder === key || x.folder.indexOf(key) >= 0; })[0];
+      if (r2) folder = r2.folder;
+    }
+    if (folder) jobs.push({ folder: folder, url: url });
+  });
+  if (!jobs.length){ $('batchResult').textContent = '没有解析出有效行（检查格式）'; return; }
+  var doneCount = 0;
+  var seq = Promise.resolve();
+  jobs.forEach(function(job){
+    seq = seq.then(function(){
+      return api('/api/link', 'POST', { folder: job.folder, url: job.url }).then(function(){ doneCount++; });
+    });
+  });
+  seq.then(function(){
+    $('batchResult').textContent = '已保存 ' + doneCount + ' / ' + jobs.length + ' 条';
+    toast('批量保存完成：' + doneCount + ' 条', 'ok');
+    loadSongs();
+  }).catch(function(e){ $('batchResult').textContent = '出错：' + e.message; });
+});
+
+/* ---------------- 启动 ---------------- */
+refreshState(function(){ renderSettings(); });
+loadSongs();
+pollJobs();
+setInterval(pollJobs, 1500);
+setInterval(function(){ refreshState(); }, 5000);
+
+/* ---------------- 使用本地视频 ---------------- */
+$('localVideoInput').addEventListener('change', function(){
+  var f = this.files && this.files[0];
+  if (!f) return;
+  var folder = this.dataset.folder;
+  if (!folder) return;
+  var sizeMB = (f.size / 1048576).toFixed(1);
+  toast('正在上传处理：' + f.name + ' (' + sizeMB + ' MB)…如需转码可能要几分钟，别关窗口', '');
+  var formData = new FormData();
+  formData.append('folder', folder);
+  formData.append('file', f, f.name);
+  fetch('/api/uselocal', { method: 'POST', body: formData })
+    .then(function(r){ return r.json(); })
+    .then(function(j){
+      if (j.error) throw new Error(j.error);
+      toast('已使用本地视频：' + f.name + ' → ' + (j.target || 'video.mp4') + ' (' + j.sizeMB + ' MB)' + (j.converted ? '（已转码为 H.264 MP4）' : ''), 'ok');
+      loadSongs();
+    })
+    .catch(function(e){ toast('上传失败：' + e.message, 'err'); });
+  this.value = '';
+});
+
+/* ================= 试看：偏移调整 / 频谱对比 / 自动对齐 ================= */
+var PV = {
+  folder:'', offMs:0, hasConfig:false,
+  ctx:null, gV:null, gS:null, pV:null, pS:null, anV:null, anS:null,
+  graphReady:false, graphTried:false, noGraph:false, canPan:false, bindDone:false,
+  playing:false, tau:0, lastTs:0, timer:null, rafOn:false,
+  songReady:false, songError:false, videoReady:false, videoFailed:false, started:false, waiting:false,
+  gatePausedVideo:false, progV:false, inApply:false, readyLogged:false
+};
+var SPEC = { vb:null, sb:null };
+
+function clampN(v,a,b){ return Math.max(a, Math.min(b, v)); }
+function pvFmt(n){ return (Math.round(n*1000)/1000).toFixed(3); }
+function pvLog(s){ var e = $('pvStatus'); if (e) e.textContent = s || ''; }
+
+function pvInitGraph(){
+  if (PV.graphReady || PV.graphTried) return PV.graphReady;
+  PV.graphTried = true;
+  var sv = null, ss = null;
+  try{
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) throw new Error('no AudioContext');
+    PV.ctx = new AC();
+    sv = PV.ctx.createMediaElementSource($('vplayer'));
+    ss = PV.ctx.createMediaElementSource($('aplayer'));
+    PV.anV = PV.ctx.createAnalyser(); PV.anV.fftSize = 2048; PV.anV.smoothingTimeConstant = 0.78;
+    PV.anS = PV.ctx.createAnalyser(); PV.anS.fftSize = 2048; PV.anS.smoothingTimeConstant = 0.78;
+    PV.gV = PV.ctx.createGain(); PV.gS = PV.ctx.createGain();
+    if (PV.ctx.createStereoPanner){ PV.pV = PV.ctx.createStereoPanner(); PV.pS = PV.ctx.createStereoPanner(); PV.canPan = true; }
+    sv.connect(PV.gV); PV.gV.connect(PV.anV);
+    ss.connect(PV.gS); PV.gS.connect(PV.anS);
+    if (PV.canPan){
+      PV.gV.connect(PV.pV); PV.pV.connect(PV.ctx.destination);
+      PV.gS.connect(PV.pS); PV.pS.connect(PV.ctx.destination);
+    } else {
+      PV.gV.connect(PV.ctx.destination); PV.gS.connect(PV.ctx.destination);
+    }
+    PV.graphReady = true;
+  }catch(e){
+    PV.noGraph = true; PV.graphReady = false;
+    try{ if (sv) sv.connect(PV.ctx.destination); }catch(e2){}
+  }
+  return PV.graphReady;
+}
+
+function pvApplyLayout(){
+  try{ var m = $('modal'); if (m) m.classList.toggle('v3d', !!($('cbVid3d') && $('cbVid3d').checked)); }catch(e){}
+}
+function pvApplyVolPan(){
+  var vv = parseInt($('volV').value, 10) / 100;
+  var vs = parseInt($('volS').value, 10) / 100;
+  var lr = !!$('cbLR').checked && PV.canPan;
+  try{
+    if (PV.graphReady){
+      PV.gV.gain.value = vv; PV.gS.gain.value = vs;
+      if (PV.canPan){ PV.pV.pan.value = lr ? -1 : 0; PV.pS.pan.value = lr ? 1 : 0; }
+    } else {
+      $('vplayer').volume = vv; $('aplayer').volume = vs;
+    }
+  }catch(e){}
+}
+
+function pvGateUpdate(){
+  try{
+    var g = $('pvGate'), b = $('pvPlay');
+    var ready = (PV.videoReady || PV.videoFailed) && (PV.songReady || PV.songError);
+    if (b) b.disabled = !ready;
+    if (!g) return;
+    if (PV.started){ g.style.display = 'none'; return; }
+    g.style.display = '';
+    g.classList.toggle('ready', !!ready);
+    g.textContent = ready ? '▶ 点击开始播放' : '加载中，请稍候…';
+  }catch(e){}
+}
+function pvMaybeReady(){
+  pvGateUpdate();
+  if (PV.songReady && PV.videoReady){
+    if (!PV.readyLogged){ PV.readyLogged = true; pvLog('✅ 就绪：点「▶ 播放」试听（建议戴耳机，用左/右耳分离听拍点）'); }
+  }
+  else if (!PV.songError && PV.folder) pvLog('视频已就绪 · 谱面音频准备中…（首次提取需几秒）');
+}
+
+function pvBind(){
+  if (PV.bindDone) return;
+  PV.bindDone = true;
+  var v = $('vplayer'), s = $('aplayer');
+  v.addEventListener('loadedmetadata', function(){ if (PV.folder){ pvApplyPositions(true, true); pvUpdateTimes(); } setTimeout(pvSize3d, 50); });
+  v.addEventListener('canplay', function(){ PV.videoReady = true; pvMaybeReady(); });
+  v.addEventListener('error', function(){ PV.videoFailed = true; pvMaybeReady(); });
+  v.addEventListener('seeking', function(){
+    if (!PV.folder) return;
+    if (PV.progV){ PV.progV = false; return; }
+    var off = PV.offMs / 1000;
+    if (Math.abs(v.currentTime - (PV.tau + off)) < 0.08) return;
+    PV.tau = Math.max(0, v.currentTime - off);
+    pvApplyPositions(true, true);
+  });
+  v.addEventListener('play', function(){ if (!PV.playing) pvUserPlay(); });
+  v.addEventListener('pause', function(){
+    if (!PV.playing) return;
+    if (PV.gatePausedVideo){ PV.gatePausedVideo = false; return; }
+    pvPause();
+  });
+  s.addEventListener('canplay', function(){ PV.songReady = true; PV.songError = false; pvMaybeReady(); });
+  s.addEventListener('error', function(){
+    if (!PV.folder) return;
+    PV.songReady = false; PV.songError = true; pvGateUpdate();
+    fetch('/api/audio?folder=' + encodeURIComponent(PV.folder) + '&track=song')
+      .then(function(r){ return r.json(); }).catch(function(){ return null; }).then(function(j){
+        pvLog(j && j.error ? ('⚠ 谱面音频不可用：' + j.error) : '⚠ 谱面音频不可用（仅播放视频声音）');
+      });
+  });
+  $('volV').addEventListener('input', function(){ pvApplyVolPan(); try{ localStorage.setItem('bsweb_volV', this.value); }catch(e){} });
+  $('volS').addEventListener('input', function(){ pvApplyVolPan(); try{ localStorage.setItem('bsweb_volS', this.value); }catch(e){} });
+  $('cbLR').addEventListener('change', function(){ pvApplyVolPan(); try{ localStorage.setItem('bsweb_lr', this.checked ? '1' : '0'); }catch(e){} });
+  window.addEventListener('resize', pvSize3d);
+  $('pvPlay').addEventListener('click', function(){ if (!PV.folder) return; if (PV.playing) pvPause(); else pvPlay(); });
+  $('pvGate').addEventListener('click', function(){
+    if (!PV.folder) return;
+    var ready = (PV.videoReady || PV.videoFailed) && (PV.songReady || PV.songError);
+    if (!ready) return;                      /* 还没加载完，点了也不动 */
+    if (!PV.playing) pvPlay();
+    pvGateUpdate();
+  });
+  $('btnStripAudio').addEventListener('click', function(){
+    if (!PV.folder) return;
+    if (!confirm('删掉当前视频里的声音？\n画面保留、只去掉音频轨道（可省体积，不可恢复）')) return;
+    var st = $('pvMaintain');
+    st.style.color = '#ffd479'; st.textContent = '正在处理（去掉音轨）…';
+    api('/api/stripaudio', 'POST', { folder: PV.folder })
+      .then(function(j){
+        st.style.color = '#5fd39b';
+        st.textContent = '✅ ' + j.name + '：' + j.beforeMB + 'MB → ' + j.afterMB + 'MB（省 ' + j.savedMB + 'MB）';
+        pvRefreshVideoSrc();
+        loadSongs();
+      })
+      .catch(function(e){ st.style.color = '#ff7a7a'; st.textContent = '⚠ ' + e.message; });
+  });
+  $('btnDelVideo').addEventListener('click', function(){
+    if (!PV.folder) return;
+    if (!confirm('确定删除这首歌的视频？\n（会删掉视频文件和 cinema-video.json，不可恢复）')) return;
+    api('/api/deletevideo', 'POST', { folder: PV.folder })
+      .then(function(j){ toast('已删除：' + j.removed.join('、'), 'ok'); pvClose(); loadSongs(); })
+      .catch(function(e){ toast('删除失败：' + e.message, 'err'); });
+  });
+  Array.prototype.forEach.call(document.querySelectorAll('#modal [data-off]'), function(b){
+    b.addEventListener('click', function(){ pvSetOffset(PV.offMs + parseInt(this.dataset.off, 10)); });
+  });
+  $('cbHit').addEventListener('change', function(){ try{ localStorage.setItem('bsweb_hit', this.checked ? '1' : '0'); }catch(e){} try{ hitReset(); }catch(e){} });
+  $('volHit').addEventListener('input', function(){ hitVolume(); try{ localStorage.setItem('bsweb_volHit', this.value); }catch(e){} });
+  $('fpsSel').addEventListener('change', function(){ FPS_CAP.target = parseInt(this.value, 10) || 0; FPS_CAP.last = 0; try{ localStorage.setItem('bsweb_fps', this.value); }catch(e){} });
+  $('cbSound3d').addEventListener('change', function(){ try{ localStorage.setItem('bsweb_sound3d', this.checked ? '1' : '0'); }catch(e){} });
+  $('cbVid3d').addEventListener('change', function(){ try{ localStorage.setItem('bsweb_vid3d', this.checked ? '1' : '0'); }catch(e){} pvApplyLayout(); });
+  $('cbChart').addEventListener('change', function(){ try{ localStorage.setItem('bsweb_chartFollow', this.checked ? '1' : '0'); }catch(e){} if (!this.checked) CH.frozenTau = PV.tau; });
+  $('diffSel').addEventListener('change', function(){ if (PV.folder) chLoad(PV.folder, this.value, true); pvSwitch3d(); });
+  $('chartCanvas').addEventListener('click', function(ev){
+    if (!PV.folder || !CH.data) return;
+    var r = this.getBoundingClientRect();
+    var px = (ev.clientX - r.left) / r.width * this.width;
+    var py = (ev.clientY - r.top) / r.height * this.height;
+    var t = chPick(px, py);
+    if (t == null) return;
+    PV.tau = Math.max(0, t);
+    if (!$('cbChart').checked) CH.frozenTau = PV.tau;
+    pvApplyPositions(true, true);
+    pvUpdateTimes();
+  });
+  $('offInput').addEventListener('change', function(){
+    var n = parseInt(this.value, 10);
+    if (isNaN(n)){ this.value = PV.offMs; return; }
+    pvSetOffset(n);
+  });
+  $('btnSaveOff').addEventListener('click', function(){
+    if (!PV.folder) return;
+    api('/api/offset', 'POST', { folder: PV.folder, offset: PV.offMs })
+      .then(function(j){ toast('偏移已保存：' + j.offset + ' ms', 'ok'); pvLog('💾 已保存到 cinema-video.json：' + j.offset + ' ms'); loadSongs(); })
+      .catch(function(e){ toast('保存失败：' + e.message, 'err'); });
+  });
+  $('btnAutoSync').addEventListener('click', function(){
+    if (!PV.folder) return;
+    var b = this;
+    b.disabled = true;
+    pvLog('🪄 正在解码并分析两条音轨（约 5~20 秒）…');
+    api('/api/autosync', 'POST', { folder: PV.folder }).then(function(j){
+      b.disabled = false;
+      var conf = (j.ratio >= 1.5) ? '高' : (j.ratio >= 1.15 ? '中' : '偏低');
+      pvSetOffset(j.offsetMs);
+      if (j.suggestSeekSec != null){ PV.tau = j.suggestSeekSec; pvApplyPositions(true, true); }
+      pvLog('🪄 自动对齐：' + j.offsetMs + ' ms（置信度 ' + conf + ' · 峰值 ' + Number(j.peak).toFixed(2) + '）已应用' + (PV.hasConfig ? '，点「💾 保存偏移」写入' : '；⚠ 无 cinema-video.json，无法保存'));
+      toast('自动对齐建议：' + j.offsetMs + ' ms（置信度 ' + conf + '）', 'ok');
+    }).catch(function(e){
+      b.disabled = false;
+      pvLog('自动对齐失败：' + e.message);
+      toast('自动对齐失败：' + e.message, 'err');
+    });
+  });
+}
+
+function open3d(folder){
+  var u = '/bs-viewer/index.html?noProxy=1&url=' + encodeURIComponent('/api/mapzip?folder=' + encodeURIComponent(folder));
+  window.open(u, '_blank');
+}
+/* 内嵌 3D：跟随当前歌曲 + 难度选择 */
+function pvSync3d(){
+  try{
+    var f = (PV.f3 && PV.f3.active) || $('view3d'); if (!f || !f.contentWindow || !PV.folder) return;
+    var dur = 0;
+    try{ var ap = $('aplayer'); if (ap && isFinite(ap.duration)) dur = ap.duration; }catch(e){}
+    if (!PV.s3d) PV.s3d = {};
+    var st = PV.s3d, now = Date.now(), tau = PV.tau, seek = false, sendTime = tau;
+    /* tau 每 100ms 才更新：外推到当前时刻，避免 ~100ms 采样滞后导致"永远差一点、反复拉" */
+    var tauNow = tau;
+    if (PV.playing && PV.lastTs){ tauNow = tau + Math.max(0, Math.min(0.3, (performance.now() - PV.lastTs) / 1000)); }
+    /* 读 viewer 的真实位置/时长（同源直读 __cc），按 viewer 的秒域换算期望位置 */
+    var vt = null, vd = 0;
+    try{ var wcc = f.contentWindow.__cc; if (wcc && wcc.song && isFinite(Number(wcc.song.currentTime))){ vt = Number(wcc.song.currentTime); vd = isFinite(Number(wcc.song.duration)) ? Number(wcc.song.duration) : 0; } }catch(e){}
+    var k = (vd > 0 && dur > 0) ? (vd / dur) : 1;
+    var expected = tauNow * k;
+    if (vt != null && vd > 0) sendTime = expected;
+    if (st.last == null){ seek = true; }
+    else {
+      var dt = (now - st.t) / 1000;
+      var expectedLast = st.last + (st.playing ? dt : 0);
+      if (Math.abs(tau - expectedLast) > 0.6) seek = true;   // 拖进度 / 改偏移 / 大漂移 → 发一次跳转
+    }
+    if (!seek && dur > 0 && PV.playing && (now - (st.resync || 0)) > 2000){   // 播放中：每 2 秒对表（偏差 >50ms 拉回）
+      st.resync = now;
+      var off = null;
+      if (vt != null && vd > 0){ off = expected - vt; }
+      else {
+        try{
+          var doc = f.contentWindow.document;
+          var p = doc && doc.querySelector('.timelineprogress');
+          if (p){ var cur = (parseFloat(p.style.width) || 0) / 100; off = (tauNow / dur - cur) * dur; sendTime = tauNow; }
+        }catch(e){}
+      }
+      if (off != null){
+        if (st.await){ /* 上一次跳转后的残差≈管道延迟：学习它，后续跳转按它补偿 → 一次到位 */
+          if (Math.abs(off) <= 0.5) st.lag = Math.max(0, Math.min(0.5, off));
+          st.await = false;
+        }
+        if (Math.abs(off) > 0.05){
+          if (now - (st.lastTryAt || 0) > 10000) st.tries = 0;   /* 10 秒重置重试计数 */
+          if ((st.tries || 0) < 3){
+            seek = true;
+            sendTime = (vt != null && vd > 0) ? (expected + (st.lag || 0)) : tauNow;
+            st.await = true; st.tries = (st.tries || 0) + 1; st.lastTryAt = now;
+          }
+        } else { st.tries = 0; }
+      }
+    }
+    var msg = { __bsv: 1, time: sendTime, duration: dur, playing: !!PV.playing, seek: seek, sound3d: ($('cbSound3d') && $('cbSound3d').checked) ? 1 : 0, video3d: (!$('cbVid3d') || $('cbVid3d').checked) ? 1 : 0, videoFolder: PV.folder || '', videoOff: PV.offMs || 0 };
+    if (PV.hardUntil && Date.now() < PV.hardUntil) msg.hard = 1;
+    try{ f.contentWindow.postMessage(msg, '*'); }catch(e){}
+    var preF = PV.f3 && PV.f3.idle;
+    if (preF && (preF.dataset.state === 'loading' || preF.dataset.state === 'ready')){ try{ preF.contentWindow.postMessage(msg, '*'); }catch(e){} }
+    st.last = tau; st.t = now; st.playing = !!PV.playing;
+  }catch(e){}
+}
+/* 3D 就绪信号：让它马上对一次表（加载期间发的跳转会因未就绪被丢弃） */
+window.addEventListener('message', function(ev){
+  try{
+    var d = ev.data; if (!d || d.__bsv_ready !== 1 || !PV || !PV.s3d) return;
+    PV.s3d.last = null;   /* 就绪：立刻对表 */
+    if (PV.f3 && PV.f3.idle && ev.source === PV.f3.idle.contentWindow && PV.f3.idle.dataset.state === 'loading'){
+      PV.f3.idle.dataset.state = 'ready';
+      setTimeout(pv3dSwap, 800);   /* 留点时间让新窗口对上位置/状态，再换场 */
+    }
+  }catch(e){}
+});
+function pv3dUrl(){
+  var d = $('diffSel') ? $('diffSel').value : '';
+  var u = '/bs-viewer/index.html?noProxy=1&url=' + encodeURIComponent('/api/mapzip?folder=' + encodeURIComponent(PV.folder));
+  if (d && /^(Easy|Normal|Hard|Expert|ExpertPlus|Expert\+)$/.test(d)) u += '&charName=Standard&diffName=' + encodeURIComponent(d);
+  return u;
+}
+function pvLoad3d(){
+  try{
+    if (!PV.folder) return;
+    var f = (PV.f3 && PV.f3.active) || $('view3d'); if (!f) return;
+    f.src = pv3dUrl();
+  }catch(e){}
+}
+/* 无缝切换：新难度先在后台（隐藏的 #view3dPre）加载，就绪后交叉淡入换场 */
+function pvSwitch3d(){
+  try{
+    if (!PV.folder || !PV.f3 || !PV.f3.idle) return;
+    var pre = PV.f3.idle;
+    pre.dataset.state = 'loading';
+    pre.style.zIndex = '1';           /* 在旧画面后面加载（两层都不透明，避免透明合成白屏） */
+    pre.src = pv3dUrl();
+    console.log('[3D] preloading new difficulty');
+  }catch(e){}
+}
+function pv3dSwap(){
+  try{
+    if (!PV.f3 || !PV.f3.idle || PV.f3.idle.dataset.state !== 'ready') return;
+    var oldF = PV.f3.active, newF = PV.f3.idle;
+    PV.s3d = {};                       /* 重新对表（下一条 sync 会 seek 到当前进度） */
+    PV.hardUntil = Date.now() + 1600;  /* 短暂硬同步窗口：新窗口立即服从播放状态 */
+    newF.style.zIndex = '2';          /* 直接换层：两层都保持不透明渲染，避免 WebGL iframe 透明合成白屏 */
+    oldF.style.zIndex = '1';
+    try{ newF.contentWindow.dispatchEvent(new Event('resize')); }catch(e){}   /* 强制重绘保险 */
+    PV.f3 = { active: newF, idle: oldF };
+    console.log('[3D] swapped');
+    setTimeout(function(){ try{ oldF.src = 'about:blank'; oldF.dataset.state = ''; }catch(e){} }, 450);
+  }catch(e){}
+}
+/* modal3d 已并入弹窗内嵌 3D（#view3d iframe） */
+function pvOpen(folder){
+  var r = null;
+  for (var i = 0; i < S.songs.length; i++){ if (S.songs[i].folder === folder){ r = S.songs[i]; break; } }
+  if (!r){ toast('未找到歌曲信息', 'err'); return; }
+  pvBind(); pvInitGraph();
+  PV.folder = folder;
+  PV.hasConfig = !!r.hasConfig;
+  PV.offMs = (r.offset == null ? 0 : Math.round(Number(r.offset))) || 0;
+  PV.playing = false; PV.tau = 0; PV.waiting = false;
+  PV.songReady = false; PV.songError = false; PV.videoReady = false; PV.videoFailed = false; PV.started = false;
+  PV.gatePausedVideo = false; PV.progV = false; PV.readyLogged = false;
+  if (PV.timer){ clearInterval(PV.timer); PV.timer = null; }
+  $('modalTitle').textContent = '🎮 试看 · ' + (r.name || folder);
+  $('modalSub').textContent = folder + (r.artist ? (' · ' + r.artist) : '');
+  PV.s3d = {};
+  PV.hardUntil = 0;
+  try{
+    PV.f3 = { active: $('view3d'), idle: $('view3dPre') };
+    PV.f3.idle.dataset.state = '';
+    PV.f3.active.style.zIndex = '2'; PV.f3.idle.style.zIndex = '1';
+  }catch(e){}
+  if (PV.sync3d){ clearInterval(PV.sync3d); }
+  PV.sync3d = setInterval(pvSync3d, 300);
+  $('offInput').value = PV.offMs;
+  $('offInput').disabled = !PV.hasConfig;
+  $('btnSaveOff').disabled = !PV.hasConfig;
+  $('btnSaveOff').title = PV.hasConfig ? '' : '缺少 cinema-video.json，无法保存';
+  try{
+    $('cbLR').checked = localStorage.getItem('bsweb_lr') === '1';
+    var a = localStorage.getItem('bsweb_volV'); if (a != null) $('volV').value = a;
+    var b = localStorage.getItem('bsweb_volS'); if (b != null) $('volS').value = b;
+    var f = localStorage.getItem('bsweb_chartFollow'); if (f != null) $('cbChart').checked = (f === '1');
+    var s3d = localStorage.getItem('bsweb_sound3d'); if (s3d != null) $('cbSound3d').checked = (s3d === '1');
+    var v3d = localStorage.getItem('bsweb_vid3d'); if (v3d != null) $('cbVid3d').checked = (v3d === '1');
+    pvApplyLayout();
+    var hh = localStorage.getItem('bsweb_hit'); if (hh != null) $('cbHit').checked = (hh === '1');
+    var hv = localStorage.getItem('bsweb_volHit'); if (hv != null) $('volHit').value = hv;
+    var fp = localStorage.getItem('bsweb_fps'); if (fp != null) $('fpsSel').value = fp;
+  }catch(e){}
+  hitInit(); hitVolume(); FPS_CAP.target = parseInt($('fpsSel').value, 10) || 0; FPS_CAP.last = 0;
+  $('cbLR').disabled = !PV.canPan;
+  $('cbLR').title = PV.canPan ? '' : '当前浏览器不支持声道分离';
+  pvApplyVolPan();
+  var v = $('vplayer'), s = $('aplayer');
+  PV.inApply = true;
+  try{ v.pause(); s.pause(); }catch(e){}
+  PV.inApply = false;
+  v.src = '/api/video?folder=' + encodeURIComponent(folder);
+  s.src = '/api/audio?folder=' + encodeURIComponent(folder) + '&track=song';
+  try{ v.load(); s.load(); }catch(e){}
+  $('modal').classList.add('on');
+  pvLog('加载视频与谱面音频…');
+  pvUpdateTimes();
+  pvUpdatePlayBtn();
+  pvGateUpdate();
+  setTimeout(pvSize3d, 300);
+  if (!PV.rafOn){ PV.rafOn = true; requestAnimationFrame(pvDraw); }
+  chLoad(folder, null, false, pvLoad3d);   /* 3D 在难度列表就绪后再加载，打开即带正确难度 */
+}
+
+function pvClose(){
+  $('modal').classList.remove('on');
+  if (PV.sync3d){ clearInterval(PV.sync3d); PV.sync3d = null; }
+  try{
+    var f3b = PV.f3;
+    if (f3b){
+      if (f3b.active) f3b.active.src = 'about:blank';
+      if (f3b.idle){ f3b.idle.src = 'about:blank'; f3b.idle.dataset.state = ''; f3b.idle.style.zIndex = '1'; }
+    } else { var v3 = $('view3d'); if (v3) v3.src = 'about:blank'; }
+  }catch(e){}
+  PV.f3 = null;
+  PV.playing = false;
+  if (PV.timer){ clearInterval(PV.timer); PV.timer = null; }
+  PV.inApply = true;
+  try{ $('vplayer').pause(); $('aplayer').pause(); }catch(e){}
+  PV.inApply = false;
+  PV.folder = '';
+}
+
+function pvSize3d(){
+  /* 3D 窗口与视频(左列)等高；视频列隐藏时交给 CSS（1:1），视频未就绪时也回落 CSS */
+  try{
+    var v = $('vplayer'), f = (PV.f3 && PV.f3.active) || $('view3d');
+    if (!v || !f || !PV.folder) return;
+    if (v.offsetParent === null){ return; }   /* 视频列隐藏：保留 CSS 高度上限 */
+    var vh = v.getBoundingClientRect().height;
+    if (!vh || vh < 60) return;
+    var cur = f.getBoundingClientRect().height;
+    if (Math.abs(cur - vh) > 1.5) f.style.height = Math.round(vh) + 'px';
+  }catch(e){}
+}
+function pvUpdatePlayBtn(){ var b = $('pvPlay'); if (b) b.textContent = PV.playing ? '⏸ 暂停' : '▶ 播放'; }
+
+function pvPlay(){
+  if (!PV.folder) return;
+  if (PV.ctx && PV.ctx.state === 'suspended'){ try{ PV.ctx.resume(); }catch(e){} }
+  PV.playing = true;
+  PV.started = true;
+  pvGateUpdate();
+  PV.lastTs = performance.now();
+  if (PV.timer) clearInterval(PV.timer);
+  PV.timer = setInterval(pvTick, 100);
+  pvApplyPositions(true, true);
+  pvUpdatePlayBtn();
+}
+
+function pvPause(){
+  PV.playing = false;
+  if (PV.timer){ clearInterval(PV.timer); PV.timer = null; }
+  PV.inApply = true;
+  try{ $('vplayer').pause(); $('aplayer').pause(); }catch(e){}
+  PV.inApply = false;
+  pvUpdatePlayBtn();
+}
+
+function pvUserPlay(){
+  if (!PV.folder) return;
+  var off = PV.offMs / 1000;
+  if (!PV.waiting){
+    var cand = $('vplayer').currentTime - off;
+    PV.tau = Math.max(0, cand);
+  }
+  pvPlay();
+}
+
+function pvTick(){
+  if (!PV.folder) return;
+  var now = performance.now();
+  var dt = (now - PV.lastTs) / 1000;
+  PV.lastTs = now;
+  if (PV.playing && dt > 0 && dt < 2) PV.tau += dt;
+  pvApplyPositions(false, false);
+  pvSize3d();
+  try{ hitSchedule(); }catch(e){}
+}
+
+function pvSetOffset(ms){
+  if (!PV.folder) return;
+  PV.offMs = Math.round(clampN(Number(ms) || 0, -600000, 600000));
+  $('offInput').value = PV.offMs;
+  pvApplyPositions(true, true);
+  pvUpdateTimes();
+}
+
+function pvApplyPositions(hard, updWait){
+  if (!PV.folder) return;
+  if (hard){ try{ hitReset(); }catch(e){} }
+  var off = PV.offMs / 1000;
+  var tS = PV.tau, tV = PV.tau + off;
+  var v = $('vplayer'), s = $('aplayer');
+  PV.inApply = true;
+  try{
+    if (tV < 0){
+      if (!v.paused && PV.playing){ PV.gatePausedVideo = true; try{ v.pause(); }catch(e){} }
+    } else {
+      if (PV.playing && v.paused && v.readyState >= 2){ var p1 = v.play(); if (p1 && p1.catch) p1.catch(function(){}); }
+      var dV = v.currentTime - tV;
+      if (v.readyState >= 1 && !v.seeking){
+        if (hard || Math.abs(dV) > 0.35){ PV.progV = true; try{ v.currentTime = Math.max(0, tV); }catch(e){} v.playbackRate = 1; }
+        else if (Math.abs(dV) > 0.06){ v.playbackRate = clampN(1 - dV * 0.5, 0.96, 1.04); }
+        else v.playbackRate = 1;
+      }
+    }
+    if (PV.songReady){
+      if (PV.playing && s.paused){ var p2 = s.play(); if (p2 && p2.catch) p2.catch(function(){}); }
+      var dS = s.currentTime - tS;
+      if (!s.seeking){
+        if (hard || Math.abs(dS) > 0.35){ try{ s.currentTime = Math.max(0, tS); }catch(e){} s.playbackRate = 1; }
+        else if (Math.abs(dS) > 0.06){ s.playbackRate = clampN(1 - dS * 0.5, 0.96, 1.04); }
+        else s.playbackRate = 1;
+      }
+    }
+    if (updWait) PV.waiting = (tV < 0);
+  } finally { PV.inApply = false; }
+}
+
+// 视频文件被替换后（比如删了音频），重新加载视频元素
+function pvRefreshVideoSrc(){
+  if (!PV.folder) return;
+  var v = $('vplayer');
+  PV.inApply = true;
+  try{ v.pause(); }catch(e){}
+  PV.inApply = false;
+  PV.videoReady = false; PV.readyLogged = false; PV.gatePausedVideo = false;
+  v.src = '/api/video?folder=' + encodeURIComponent(PV.folder) + '&_=' + Date.now();
+  try{ v.load(); }catch(e){}
+  pvApplyPositions(true, true);
+  if (PV.playing){ var p = v.play(); if (p && p.catch) p.catch(function(){}); }
+}
+
+function pvUpdateTimes(){
+  var v = $('vplayer'), s = $('aplayer');
+  var t1 = (v && v.currentTime) || 0, t2 = (s && s.currentTime) || 0;
+  var extra = '';
+  if (PV.playing && (PV.tau + PV.offMs / 1000) < 0) extra = ' · ⏳视频稍后开始';
+  $('pvTimes').textContent = '视频 ' + pvFmt(t1) + 's · 谱面 ' + pvFmt(t2) + 's · 偏移 ' + PV.offMs + ' ms' + extra;
+}
+
+function pvDraw(){
+  if (!$('modal').classList.contains('on') || !PV.folder){ PV.rafOn = false; return; }
+  var nowMs = performance.now();
+  var iv = FPS_CAP.target > 0 ? (1000 / FPS_CAP.target) : 0;
+  if (iv && FPS_CAP.last && (nowMs - FPS_CAP.last) < (iv - 1.2)){ requestAnimationFrame(pvDraw); return; }
+  var dtMs = FPS_CAP.last ? (nowMs - FPS_CAP.last) : 0;
+  FPS_CAP.last = nowMs;
+  try{ pvDrawSpectrum(); }catch(e){}
+  try{ pvDrawChart(); }catch(e){}
+  pvUpdateTimes();
+  if (dtMs > 0 && dtMs < 500){ FPS_CAP.acc += dtMs; FPS_CAP.cnt++; if (FPS_CAP.acc >= 600){ var f = 1000 / (FPS_CAP.acc / FPS_CAP.cnt); FPS_CAP.acc = 0; FPS_CAP.cnt = 0; if ($('fpsNow')) $('fpsNow').textContent = '≈' + Math.round(f) + ' fps'; } }
+  requestAnimationFrame(pvDraw);
+}
+
+function pvDrawSpectrum(){
+  var c = $('specCanvas'); if (!c) return;
+  var g = c.getContext('2d');
+  var W = c.width, H = c.height, mid = Math.round(H / 2);
+  g.fillStyle = '#0e1013'; g.fillRect(0, 0, W, H);
+  g.strokeStyle = '#2e3340';
+  g.beginPath(); g.moveTo(0, mid + 0.5); g.lineTo(W, mid + 0.5); g.stroke();
+  var N = Math.min(180, Math.max(48, Math.round(W / 11))), fMin = 45, fMax = 15000;
+  var sr = PV.ctx ? PV.ctx.sampleRate : 44100;
+  var bins = PV.anV ? PV.anV.frequencyBinCount : 1024;
+  var binHz = sr / 2048;
+  var vbuf = null, sbuf = null;
+  if (PV.graphReady && PV.anV){
+    if (!SPEC.vb || SPEC.vb.length !== bins) SPEC.vb = new Uint8Array(bins);
+    PV.anV.getByteFrequencyData(SPEC.vb); vbuf = SPEC.vb;
+  }
+  if (PV.graphReady && PV.anS){
+    if (!SPEC.sb || SPEC.sb.length !== bins) SPEC.sb = new Uint8Array(bins);
+    PV.anS.getByteFrequencyData(SPEC.sb); sbuf = SPEC.sb;
+  }
+  var bw = W / N, maxH = mid - 14;
+  for (var b = 0; b < N; b++){
+    var f0 = fMin * Math.pow(fMax / fMin, b / N);
+    var f1 = fMin * Math.pow(fMax / fMin, (b + 1) / N);
+    var i0 = Math.max(1, Math.floor(f0 / binHz));
+    var i1 = Math.min(bins - 1, Math.max(i0, Math.floor(f1 / binHz) - 1));
+    var x = Math.round(b * bw) + 1, w2 = Math.max(1, Math.floor(bw) - 2);
+    var val = 0, i;
+    if (vbuf){ for (i = i0; i <= i1; i++){ if (vbuf[i] > val) val = vbuf[i]; } }
+    var h = Math.pow(val / 255, 1.35) * maxH;
+    g.fillStyle = 'rgba(78,201,230,0.85)';
+    g.fillRect(x, mid - 1 - h, w2, h);
+    val = 0;
+    if (sbuf){ for (i = i0; i <= i1; i++){ if (sbuf[i] > val) val = sbuf[i]; } }
+    h = Math.pow(val / 255, 1.35) * maxH;
+    g.fillStyle = 'rgba(255,169,77,0.85)';
+    g.fillRect(x, mid + 1, w2, h);
+  }
+  var fs = Math.max(12, Math.round(W / 72));
+  g.font = fs + 'px Consolas,monospace';
+  g.textAlign = 'left'; g.textBaseline = 'top';
+  g.fillStyle = 'rgba(78,201,230,0.9)'; g.fillText('视频', 10, 6);
+  g.fillStyle = 'rgba(255,169,77,0.9)'; g.fillText('谱面', 10, H - fs - 8);
+  g.textAlign = 'center';
+  if (!PV.graphReady){
+    g.fillStyle = '#9aa3b2'; g.fillText('（当前浏览器不支持频谱显示）', W / 2, mid - fs / 2 - 6);
+  } else if (!PV.songReady && !PV.songError && PV.folder){
+    g.fillStyle = '#9aa3b2'; g.fillText('谱面音频准备中…', W / 2, mid - fs / 2 - 6);
+  }
+}
+/* ================= 打击音效（Web Audio 合成，按音频时钟精确排程） ================= */
+var HIT = { ctx:null, buf:null, gain:null, sched:0, srcs:[] };
+function hitInit(){
+  if (HIT.ctx) return;
+  try{
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    HIT.ctx = new AC();
+    var sr = HIT.ctx.sampleRate, n = Math.max(48, Math.floor(sr * 0.02));
+    var b = HIT.ctx.createBuffer(1, n, sr), d = b.getChannelData(0);
+    var seed = 20260924;
+    for (var i = 0; i < n; i++){
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      var rnd = (seed / 0x7fffffff) * 2 - 1;
+      d[i] = rnd * Math.exp(-i / (sr * 0.0035));
+    }
+    HIT.buf = b;
+    HIT.gain = HIT.ctx.createGain();
+    HIT.gain.gain.value = 0.6;
+    HIT.gain.connect(HIT.ctx.destination);
+  }catch(e){}
+}
+function hitVolume(){
+  if (HIT.gain){ var v = parseInt($('volHit') && $('volHit').value, 10); HIT.gain.gain.value = (isNaN(v) ? 70 : v) / 100 * 0.9; }
+}
+function hitPlay(when, color){
+  if (!HIT.ctx || !HIT.buf) return;
+  try{
+    if (HIT.ctx.state === 'suspended') HIT.ctx.resume();
+    var ctx = HIT.ctx;
+    var o = ctx.createOscillator();
+    o.type = 'triangle';
+    o.frequency.value = color === 1 ? 2300 : 1500;
+    var og = ctx.createGain();
+    og.gain.setValueAtTime(0.0001, when);
+    og.gain.exponentialRampToValueAtTime(1.0, when + 0.003);
+    og.gain.exponentialRampToValueAtTime(0.0006, when + 0.085);
+    var hp = ctx.createBiquadFilter();
+    hp.type = 'highpass'; hp.frequency.value = 800; hp.Q.value = 0.7;
+    o.connect(og); og.connect(hp); hp.connect(HIT.gain);
+    o.start(when); o.stop(when + 0.10);
+    HIT.srcs.push(o);
+    if (HIT.buf){
+      var n = ctx.createBufferSource();
+      n.buffer = HIT.buf;
+      n.playbackRate.value = 1.8;
+      var nf = ctx.createBiquadFilter();
+      nf.type = 'highpass'; nf.frequency.value = 3000; nf.Q.value = 0.6;
+      var ng = ctx.createGain();
+      ng.gain.setValueAtTime(color === 1 ? 0.5 : 0.62, when);
+      ng.gain.exponentialRampToValueAtTime(0.0006, when + 0.022);
+      n.connect(nf); nf.connect(ng); ng.connect(HIT.gain);
+      n.start(when); n.stop(when + 0.03);
+      HIT.srcs.push(n);
+    }
+    if (HIT.srcs.length > 128) HIT.srcs.shift();
+  }catch(e){}
+}
+function hitReset(){
+  for (var i = 0; i < HIT.srcs.length; i++){ try{ HIT.srcs[i].stop(); }catch(e){} }
+  HIT.srcs = [];
+  HIT.sched = PV.tau || 0;
+}
+function hitSchedule(){
+  if (!HIT.ctx || !CH.data || !PV.playing) return;
+  if (!($('cbHit') && $('cbHit').checked)){ HIT.sched = PV.tau; return; }
+  var tau = PV.tau;
+  if (!(HIT.sched > 0) || HIT.sched > tau + 1 || tau - HIT.sched > 2) HIT.sched = tau;
+  var t0 = HIT.sched, t1 = tau + 0.25;
+  if (t1 <= t0) { return; }
+  var notes = CH.data.notes, n = 0, now = HIT.ctx.currentTime;
+  var lo = 0, hi = Math.max(0, notes.length - 1);
+  while (lo < hi){ var mid = (lo + hi) >> 1; if (notes[mid][0] < t0) lo = mid + 1; else hi = mid; }
+  for (var i = Math.max(0, lo - 1); i < notes.length; i++){
+    var nt = notes[i][0];
+    if (nt <= t0) continue;
+    if (nt > t1) break;
+    if (++n > 16) break;
+    hitPlay(now + Math.max(0, nt - tau), notes[i][3]);
+  }
+  HIT.sched = t1;
+}
+
+/* ================= 渲染帧数节流 ================= */
+var FPS_CAP = { target: 60, last: 0, acc: 0, cnt: 0 };
+
+/* ================= 谱面预览（3D；WebGL/GPU 优先，软件 3D 回退） ================= */
+var CH = { folder:'', data:null, err:'', diff:'', frozenTau:null, mode:'', gl:null, ctx2d:null, prog:null, buf:null, loc:{}, pv:null };
+var CHV = { speed: 2.2, playZ: -1.2, laneW: 0.64, layerStep: 0.66, baseY: 0.70, eyeY: 2.30, eyeZ: 4.40, aimZ: -12, centerY: 1.36, halfH: 1.05 };
+var CH_DIRS = [[0,1],[0,-1],[-1,0],[1,0],[-0.7071,0.7071],[0.7071,0.7071],[-0.7071,-0.7071],[0.7071,-0.7071]];
+function chEye(){ return [0, CHV.eyeY, CHV.eyeZ]; }
+function chAim(){
+  var dist = CHV.eyeZ - CHV.playZ;
+  var aimY = CHV.eyeY + (CHV.centerY - CHV.eyeY) * (CHV.eyeZ - CHV.aimZ) / dist;
+  return [0, aimY, CHV.aimZ];
+}
+var _mM = new Float32Array(16), _mMVP = new Float32Array(16), _mP = null, _mV = null;
+
+function m4mulInto(out, a, b){
+  for (var c = 0; c < 4; c++) for (var r = 0; r < 4; r++){
+    out[c*4+r] = a[0*4+r]*b[c*4+0] + a[1*4+r]*b[c*4+1] + a[2*4+r]*b[c*4+2] + a[3*4+r]*b[c*4+3];
+  }
+  return out;
+}
+function m4persp(fovy, aspect, near, far){
+  var f = 1 / Math.tan(fovy / 2), nf = 1 / (near - far);
+  return new Float32Array([f/aspect,0,0,0, 0,f,0,0, 0,0,(far+near)*nf,-1, 0,0,2*far*near*nf,0]);
+}
+function m4lookAt(e, a, u){
+  var zx = e[0]-a[0], zy = e[1]-a[1], zz = e[2]-a[2];
+  var zl = Math.hypot(zx, zy, zz) || 1; zx/=zl; zy/=zl; zz/=zl;
+  var xx = u[1]*zz - u[2]*zy, xy = u[2]*zx - u[0]*zz, xz = u[0]*zy - u[1]*zx;
+  var xl = Math.hypot(xx, xy, xz) || 1; xx/=xl; xy/=xl; xz/=xl;
+  var yx = zy*xz - zz*xy, yy = zz*xx - zx*xz, yz = zx*xy - zy*xx;
+  return new Float32Array([
+    xx, yx, zx, 0,
+    xy, yy, zy, 0,
+    xz, yz, zz, 0,
+    -(xx*e[0]+xy*e[1]+xz*e[2]), -(yx*e[0]+yy*e[1]+yz*e[2]), -(zx*e[0]+zy*e[1]+zz*e[2]), 1
+  ]);
+}
+function m4trsInto(out, tx, ty, tz, sx, sy, sz, rz){
+  var c = Math.cos(rz || 0), s = Math.sin(rz || 0);
+  out[0] = sx*c; out[1] = sx*s; out[2] = 0; out[3] = 0;
+  out[4] = -sy*s; out[5] = sy*c; out[6] = 0; out[7] = 0;
+  out[8] = 0; out[9] = 0; out[10] = sz; out[11] = 0;
+  out[12] = tx; out[13] = ty; out[14] = tz; out[15] = 1;
+  return out;
+}
+function m4pt(m, x, y, z){
+  return [ m[0]*x + m[4]*y + m[8]*z + m[12], m[1]*x + m[5]*y + m[9]*z + m[13], m[2]*x + m[6]*y + m[10]*z + m[14] ];
+}
+function chProject(pv, x, y, z, W, H){
+  var cx = pv[0]*x + pv[4]*y + pv[8]*z + pv[12];
+  var cy = pv[1]*x + pv[5]*y + pv[9]*z + pv[13];
+  var cw = pv[3]*x + pv[7]*y + pv[11]*z + pv[15];
+  if (cw <= 0.0001) return null;
+  return { x: (cx/cw*0.5 + 0.5)*W, y: (1 - (cy/cw*0.5 + 0.5))*H, w: cw };
+}
+
+function chProj(W, H){
+  var aspect = W / H;
+  var dist = CHV.eyeZ - CHV.playZ;
+  var tanY = CHV.halfH / Math.max(0.001, dist);
+  var fovy = 2 * Math.atan(tanY);
+  return m4persp(fovy, aspect, 0.03, 300);
+}
+function chCubeData(){
+  var S = 0.5;
+  var V = [[-S,-S,-S],[S,-S,-S],[-S,S,-S],[S,S,-S],[-S,-S,S],[S,-S,S],[-S,S,S],[S,S,S]];
+  var faces = [[[4,5,7,6],1.05],[[1,0,2,3],0.72],[[2,3,7,6],1.18],[[0,1,5,4],0.55],[[1,3,7,5],0.92],[[0,4,6,2],0.80]];
+  var arr = [];
+  faces.forEach(function(f){
+    var q = f[0], sh = f[1];
+    [[q[0],q[1],q[2]],[q[0],q[2],q[3]]].forEach(function(t){
+      t.forEach(function(i){ arr.push(V[i][0], V[i][1], V[i][2], sh); });
+    });
+  });
+  return new Float32Array(arr);
+}
+
+function chInitGL(gl){
+  var vsrc = 'attribute vec3 aPos; attribute float aShade; uniform mat4 uMVP; varying float vShade; void main(){ vShade = aShade; gl_Position = uMVP * vec4(aPos, 1.0); }';
+  var fsrc = 'precision mediump float; uniform vec4 uColor; varying float vShade; void main(){ gl_FragColor = vec4(uColor.rgb * vShade, uColor.a); }';
+  function mk(type, src){
+    var s = gl.createShader(type); gl.shaderSource(s, src); gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) throw new Error('shader: ' + gl.getShaderInfoLog(s));
+    return s;
+  }
+  var p = gl.createProgram();
+  gl.attachShader(p, mk(gl.VERTEX_SHADER, vsrc));
+  gl.attachShader(p, mk(gl.FRAGMENT_SHADER, fsrc));
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) throw new Error('link: ' + gl.getProgramInfoLog(p));
+  gl.useProgram(p);
+  var buf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, buf);
+  gl.bufferData(gl.ARRAY_BUFFER, chCubeData(), gl.STATIC_DRAW);
+  var aPos = gl.getAttribLocation(p, 'aPos'), aSh = gl.getAttribLocation(p, 'aShade');
+  gl.enableVertexAttribArray(aPos); gl.vertexAttribPointer(aPos, 3, gl.FLOAT, false, 16, 0);
+  gl.enableVertexAttribArray(aSh); gl.vertexAttribPointer(aSh, 1, gl.FLOAT, false, 16, 12);
+  var tri = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, tri);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([0.5,0,0,1.0, -0.5,0.5,0,0.85, -0.5,-0.5,0,0.85]), gl.STATIC_DRAW);
+  CH.prog = p; CH.buf = buf; CH.tri = tri; CH.aPos = aPos; CH.aSh = aSh;
+  CH.loc.mvp = gl.getUniformLocation(p, 'uMVP');
+  CH.loc.color = gl.getUniformLocation(p, 'uColor');
+  return true;
+}
+function chInit(){
+  if (CH.mode) return CH.mode;
+  try{
+    var c = $('chartCanvas');
+    var gl = c.getContext('webgl', { antialias: true, alpha: false, depth: true, preserveDrawingBuffer: true }) || c.getContext('experimental-webgl', { antialias: true });
+    if (gl && chInitGL(gl)){ CH.gl = gl; CH.mode = 'gl'; return CH.mode; }
+  }catch(e){}
+  try{ CH.ctx2d = $('chartCanvas').getContext('2d'); }catch(e){}
+  CH.mode = CH.ctx2d ? 'sw3d' : '';
+  return CH.mode;
+}
+function chModeLabel(){ return CH.mode === 'gl' ? '3D·GPU(WebGL)' : CH.mode === 'sw3d' ? '3D·CPU(软件)' : '不可用'; }
+
+function chLoad(folder, diff, keepSel, then){
+  CH.folder = folder; CH.err = ''; CH.data = null; CH.diff = diff || ''; CH.frozenTau = null;
+  chInit();
+  var sel = $('diffSel');
+  if (!keepSel && sel) sel.innerHTML = '<option>加载中…</option>';
+  if ($('chartStats')) $('chartStats').textContent = '加载中…';
+  var url = '/api/beatmap?folder=' + encodeURIComponent(folder) + (diff ? ('&diff=' + encodeURIComponent(diff)) : '');
+  fetch(url).then(function(r){ return r.json(); }).then(function(j){
+    if (!j || j.error){ CH.err = (j && j.error) || '加载失败'; if (!keepSel) $('diffSel').innerHTML = ''; $('chartStats').textContent = '⚠ ' + CH.err; return; }
+    CH.data = j; CH.diff = j.difficulty;
+    if (!keepSel){
+      var html = '';
+      (j.diffs || []).forEach(function(d){ html += '<option value="' + esc(d) + '"' + (d === j.difficulty ? ' selected' : '') + '>' + esc(d) + '</option>'; });
+      $('diffSel').innerHTML = html || '<option>无</option>';
+    }
+    $('chartStats').textContent = 'BPM ' + j.bpm + ' · 音符 ' + j.counts.notes + ' · 炸弹 ' + j.counts.bombs + ' · 围墙 ' + j.counts.obstacles + ' · 平均 ' + j.nps + ' NPS · NJS ' + j.njs + ' · ' + chModeLabel();
+    if (then){ try{ then(); }catch(e){} }   /* 下拉填好后（含默认选中）再加载 3D */
+  }).catch(function(e){ CH.err = e.message; $('chartStats').textContent = '⚠ ' + e.message; if (then){ try{ then(); }catch(e){} } });
+}
+function chViewTau(){
+  var follow = $('cbChart') && $('cbChart').checked;
+  if (follow) return PV.tau;
+  return (CH.frozenTau == null ? PV.tau : CH.frozenTau);
+}
+function chTimeAtY(y){ return chViewTau() + (y - 150) / 150; }
+function chNotePos(t, x, y, tau){
+  return { x: (x - 1.5) * CHV.laneW, y: CHV.baseY + y * CHV.layerStep, z: CHV.playZ - (t - tau) * CHV.speed };
+}
+function chScene(tau){
+  var it = [];
+  it.push({ x:0, y:-0.06, z:-16, sx:3.6, sy:0.1, sz:44, rz:0, color:[0.085,0.095,0.115], alpha:1, opaque:true });
+  for (var i = 0; i <= 4; i++) it.push({ x:(i - 2) * CHV.laneW, y:0.02, z:-16, sx:0.03, sy:0.02, sz:44, rz:0, color:[0.24,0.27,0.33], alpha:1, opaque:true });
+  var d = CH.data; if (!d) return it;
+  var t0 = tau - 0.001, t1 = tau + 3.4;   // 已受击（越过播放线）的方块不再显示
+  var obs = d.obstacles;
+  for (var k = 0; k < obs.length; k++){
+    var o = obs[k], oz = CHV.playZ - (o[0] - tau) * CHV.speed, zl = Math.max(0.3, o[3] * CHV.speed);
+    if (oz + zl < -1.4 || oz - zl > 1.2) continue;
+    it.push({ x: (o[1] + (o[2] - 1)/2 - 1.5) * CHV.laneW, y:1.30, z: oz - zl/2, sx: o[2]*CHV.laneW, sy:2.5, sz: zl, rz:0, color:[0.82,0.86,0.95], alpha:0.20, opaque:false });
+  }
+  var notes = d.notes;
+  var lo = 0, hi = Math.max(0, notes.length - 1);
+  while (lo < hi){ var mid = (lo + hi) >> 1; if (notes[mid][0] < t0) lo = mid + 1; else hi = mid; }
+  for (var n = Math.max(0, lo - 1); n < notes.length; n++){
+    var nt = notes[n][0];
+    if (nt < t0) continue;
+    if (nt > t1) break;
+    var p = chNotePos(nt, notes[n][1], notes[n][2], tau);
+    var col = notes[n][3] === 1 ? [0.30,0.62,1.00] : [1.00,0.28,0.40];
+    var near = (nt - tau) < 0.35 && (nt - tau) >= 0;
+    it.push({ x:p.x, y:p.y, z:p.z, sx:0.52, sy:0.52, sz:0.42, rz:0, color:col, alpha:1, opaque:true, note:true, nt:nt });
+    var dir = notes[n][4];
+    var zf = p.z + 0.23;
+    if (dir === 8){
+      it.push({ shape:'cube', x:p.x, y:p.y, z:zf, sx:0.17, sy:0.17, sz:0.05, rz:0.785, color:[0.14,0.14,0.17], alpha:1, opaque:true });
+    } else {
+      var dv = CH_DIRS[dir] || CH_DIRS[0];
+      var ang = Math.atan2(dv[1], dv[0]);
+      it.push({ shape:'cube', x:p.x + Math.cos(ang) * 0.02, y:p.y + Math.sin(ang) * 0.02, z:zf, sx:0.27, sy:0.085, sz:0.05, rz:ang, color:[0.14,0.14,0.17], alpha:1, opaque:true });
+      it.push({ shape:'tri', x:p.x + Math.cos(ang) * 0.21, y:p.y + Math.sin(ang) * 0.21, z:zf, sx:0.20, sy:0.30, sz:1, rz:ang, color:[0.14,0.14,0.17], alpha:1, opaque:true });
+    }
+    if (near) it.push({ x:p.x, y:p.y, z:p.z, sx:0.68, sy:0.68, sz:0.52, rz:0, color:[1,1,1], alpha:0.13, opaque:false });
+  }
+  var bombs = d.bombs;
+  for (var b = 0; b < bombs.length; b++){
+    var bp = chNotePos(bombs[b][0], bombs[b][1], bombs[b][2], tau);
+    if (bp.z < -1.4 || bp.z > 1.2) continue;
+    it.push({ x:bp.x, y:bp.y, z:bp.z, sx:0.44, sy:0.44, sz:0.4, rz:0, color:[0.16,0.16,0.19], alpha:1, opaque:true });
+  }
+  it.push({ x:0, y:0.035, z:CHV.playZ, sx:4.2, sy:0.02, sz:0.09, rz:0, color:[1,0.84,0.45], alpha:0.95, opaque:false });
+  it.push({ x:0, y:1.35, z:CHV.playZ, sx:0.045, sy:2.5, sz:0.03, rz:0, color:[1,0.84,0.45], alpha:0.55, opaque:false });
+  return it;
+}
+function chDrawShapeGL(gl, PV, it){
+  m4trsInto(_mM, it.x, it.y, it.z, it.sx, it.sy, it.sz, it.rz || 0);
+  m4mulInto(_mMVP, PV, _mM);
+  gl.uniformMatrix4fv(CH.loc.mvp, false, _mMVP);
+  gl.uniform4f(CH.loc.color, it.color[0], it.color[1], it.color[2], it.alpha == null ? 1 : it.alpha);
+  var isTri = (it.shape === 'tri');
+  gl.bindBuffer(gl.ARRAY_BUFFER, isTri ? CH.tri : CH.buf);
+  gl.vertexAttribPointer(CH.aPos, 3, gl.FLOAT, false, 16, 0);
+  gl.vertexAttribPointer(CH.aSh, 1, gl.FLOAT, false, 16, 12);
+  gl.drawArrays(gl.TRIANGLES, 0, isTri ? 3 : 36);
+}
+function pvDrawChartGL(tau){
+  var gl = CH.gl, c = $('chartCanvas'), W = c.width, H = c.height;
+  gl.viewport(0, 0, W, H);
+  gl.clearColor(0.055, 0.063, 0.074, 1);
+  gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
+  gl.enable(gl.DEPTH_TEST); gl.disable(gl.CULL_FACE);
+  gl.enable(gl.BLEND); gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+  gl.useProgram(CH.prog);
+  gl.enableVertexAttribArray(CH.aPos);
+  gl.enableVertexAttribArray(CH.aSh);
+  var P = chProj(W, H);
+  var V = m4lookAt(chEye(), chAim(), [0,1,0]);
+  var PV = m4mulInto(new Float32Array(16), P, V);
+  CH.pv = PV;
+  var items = chScene(tau), i;
+  for (i = 0; i < items.length; i++) if (items[i].opaque) chDrawShapeGL(gl, PV, items[i]);
+  gl.depthMask(false);
+  for (i = 0; i < items.length; i++) if (!items[i].opaque) chDrawShapeGL(gl, PV, items[i]);
+  gl.depthMask(true);
+}
+function pvDrawChartSW(tau){
+  var c = $('chartCanvas'), g = CH.ctx2d;
+  if (!g) return;
+  var W = c.width, H = c.height;
+  g.setTransform(1,0,0,1,0,0);
+  g.fillStyle = '#0e1013'; g.fillRect(0, 0, W, H);
+  var P = chProj(W, H);
+  var V = m4lookAt(chEye(), chAim(), [0,1,0]);
+  var PV = m4mulInto(new Float32Array(16), P, V);
+  CH.pv = PV;
+  var items = chScene(tau);
+  var corners = [[-.5,-.5,-.5],[.5,-.5,-.5],[-.5,.5,-.5],[.5,.5,-.5],[-.5,-.5,.5],[.5,-.5,.5],[-.5,.5,.5],[.5,.5,.5]];
+  var faceIdx = [[4,5,7,6],[1,0,2,3],[2,3,7,6],[0,1,5,4],[1,3,7,5],[0,4,6,2]];
+  var faceShade = [1.05,0.72,1.18,0.55,0.92,0.80];
+  var triPts = [[0.5,0,0],[-0.5,0.5,0],[-0.5,-0.5,0]];
+  var faces = [];
+  for (var i = 0; i < items.length; i++){
+    var it = items[i];
+    m4trsInto(_mM, it.x, it.y, it.z, it.sx, it.sy, it.sz, it.rz || 0);
+    var isTri = (it.shape === 'tri');
+    var src = isTri ? triPts : corners;
+    var p3 = [];
+    for (var v = 0; v < src.length; v++) p3.push(m4pt(_mM, src[v][0], src[v][1], src[v][2]));
+    if (isTri){
+      var tp = [], tok = true, tzs = 0;
+      for (var kk = 0; kk < 3; kk++){
+        var tpr = chProject(PV, p3[kk][0], p3[kk][1], p3[kk][2], W, H);
+        if (!tpr){ tok = false; break; }
+        tp.push(tpr); tzs += tpr.w;
+      }
+      if (tok) faces.push({ poly: tp, depth: tzs/3, color: it.color, shade: 1.0, alpha: it.alpha == null ? 1 : it.alpha });
+      continue;
+    }
+    for (var f = 0; f < 6; f++){
+      var q = faceIdx[f], poly = [], ok = true, zs = 0;
+      for (var k = 0; k < 4; k++){
+        var pr = chProject(PV, p3[q[k]][0], p3[q[k]][1], p3[q[k]][2], W, H);
+        if (!pr){ ok = false; break; }
+        poly.push(pr); zs += pr.w;
+      }
+      if (!ok) continue;
+      faces.push({ poly: poly, depth: zs/4 + (it.opaque ? 0 : -0.0001), color: it.color, shade: faceShade[f], alpha: it.alpha == null ? 1 : it.alpha });
+    }
+  }
+  faces.sort(function(a, b){ return b.depth - a.depth; });
+  for (var j = 0; j < faces.length; j++){
+    var fc = faces[j];
+    g.beginPath();
+    g.moveTo(fc.poly[0].x, fc.poly[0].y);
+    for (var m = 1; m < 4; m++) g.lineTo(fc.poly[m].x, fc.poly[m].y);
+    g.closePath();
+    g.fillStyle = 'rgba(' + Math.round(fc.color[0]*255*fc.shade) + ',' + Math.round(fc.color[1]*255*fc.shade) + ',' + Math.round(fc.color[2]*255*fc.shade) + ',' + fc.alpha + ')';
+    g.fill();
+  }
+}
+function pvDrawChart(){
+  var c = $('chartCanvas'); if (!c) return;
+  if (!CH.mode) chInit();
+  var tau = chViewTau();
+  if (CH.gl){ pvDrawChartGL(tau); return; }
+  var g = CH.ctx2d;
+  if (!g) return;
+  if (!CH.data){
+    g.setTransform(1,0,0,1,0,0);
+    g.fillStyle = '#0e1013'; g.fillRect(0, 0, c.width, c.height);
+    g.fillStyle = '#9aa3b2'; g.font = '20px Consolas,monospace';
+    g.fillText(CH.err ? ('⚠ ' + CH.err) : '谱面加载中…', 24, 42);
+    return;
+  }
+  pvDrawChartSW(tau);
+}
+function chPick(px, py){
+  if (!CH.data || !CH.pv) return null;
+  var c = $('chartCanvas'), W = c.width, H = c.height;
+  var tau = chViewTau(), best = null, bestD = 90*90;
+  var notes = CH.data.notes, t0 = tau - 0.9, t1 = tau + 3.4;
+  var lo = 0, hi = Math.max(0, notes.length - 1);
+  while (lo < hi){ var mid = (lo + hi) >> 1; if (notes[mid][0] < t0) lo = mid + 1; else hi = mid; }
+  for (var i = Math.max(0, lo - 1); i < notes.length; i++){
+    var nt = notes[i][0];
+    if (nt < t0) continue;
+    if (nt > t1) break;
+    var p = chNotePos(nt, notes[i][1], notes[i][2], tau);
+    var s = chProject(CH.pv, p.x, p.y, p.z, W, H);
+    if (!s) continue;
+    var dx = s.x - px, dy = s.y - py, d2 = dx*dx + dy*dy;
+    if (d2 < bestD){ bestD = d2; best = nt; }
+  }
+  return best;
+}
+
+/* ================= 试听（无视频时用来确认是哪首歌） ================= */
+function ldOpen(folder, name, artist){
+  $('ldTitle').textContent = '🎧 试听 · ' + (name || folder);
+  $('ldSub').textContent = folder + (artist ? (' · ' + artist) : '');
+  $('ldModal').classList.add('on');
+  var a = $('ldPlayer');
+  $('ldStatus').textContent = '加载中…（首次需要提取音频，一般几秒）';
+  a.oncanplay = function(){ $('ldStatus').textContent = ''; };
+  a.onerror = function(){ $('ldStatus').textContent = '⚠ 无法加载这首歌的音频'; };
+  a.src = '/api/audio?folder=' + encodeURIComponent(folder) + '&track=song';
+  try{ a.load(); }catch(e){}
+  setTimeout(function(){ var p = a.play(); if (p && p.catch) p.catch(function(){}); }, 60);
+}
+function ldClose(){
+  var a = $('ldPlayer');
+  try{ a.pause(); a.removeAttribute('src'); a.load(); }catch(e){}
+  $('ldModal').classList.remove('on');
+  $('ldStatus').textContent = '';
+}
+$('ldClose').addEventListener('click', ldClose);
+$('ldModal').addEventListener('click', function(e){ if (e.target === this) ldClose(); });
+
+/* ================= 音频查重 ================= */
+var DUP = { timer:null, last:null };
+function dupSummaryText(j){
+  if (j.running) return '分析中…';
+  if (j.error) return '出错：' + j.error;
+  var g = j.groups || [], extra = 0;
+  for (var i = 0; i < g.length; i++) extra += g[i].members.length - 1;
+  return '重复 ' + (j.exactCount || 0) + ' 组 · 冗余 ' + extra + ' 个文件夹';
+}
+function dupRender(j){
+  DUP.last = j;
+  $('dupSummary').textContent = dupSummaryText(j);
+  var body = $('dupBody'), html = '';
+  if (j.error) html += '<div class="hint" style="color:#ff7a7a">⚠ ' + esc(j.error) + '</div>';
+  if (j.running){
+    html += '<div class="hint">' + esc(j.phase || '分析中…') + '</div>';
+  }
+  var groups = j.groups || [];
+  if (!j.running && !groups.length && !j.error) html += '<div class="hint">没找到重复的文件夹 🎉</div>';
+  for (var i = 0; i < groups.length; i++){
+    var g = groups[i];
+    html += '<div class="dupgroup"><div class="duphdr">🟡 重复 ID <b class="mono">' + esc(g.key || '') + '</b> · ' + g.members.length + ' 个文件夹' +
+            (g.members.length > 1 ? ' <button class="btn gray btn-sm" style="margin-left:8px" data-act="dupkeep" data-group="' + i + '">🗑 只留第 1 个，其余移出</button>' : '') + '</div>';
+    for (var k = 0; k < g.members.length; k++){
+      var m = g.members[k];
+      html += '<div class="duprow"><span class="mono small">' + esc(m.folder) + '</span> <b>' + esc(m.name) + '</b>' +
+              (m.artist ? ' <span class="small">· ' + esc(m.artist) + '</span>' : '') +
+              ' <span class="small">' + (m.hasVideo ? ('🎬 ' + m.videoSizeMB + 'MB') : '<span style="color:#ff9f43">无视频</span>') + '</span>' +
+              ' <button class="btn gray btn-sm" data-act="' + (m.hasVideo ? 'preview' : 'listen') + '" data-folder="' + esc(m.folder) + '" data-name="' + esc(m.name) + '">' + (m.hasVideo ? '🎬 试看' : '🎧 试听') + '</button>' +
+              ' <button class="btn gray btn-sm" data-act="folder" data-folder="' + esc(m.folder) + '">📂</button>' +
+              ' <button class="btn gray btn-sm" data-act="delsong" data-folder="' + esc(m.folder) + '">🗑 移出</button></div>';
+    }
+    html += '</div>';
+  }
+  body.innerHTML = html;
+}
+function dupPoll(){
+  fetch('/api/audiocheck/status').then(function(r){ return r.json(); }).then(function(j){
+    dupRender(j);
+    if (j.running) DUP.timer = setTimeout(dupPoll, 900); else DUP.timer = null;
+  }).catch(function(){ DUP.timer = null; });
+}
+function dupStart(){
+  if (DUP.timer) return;
+  api('/api/audiocheck/start', 'POST', {}).then(function(){ dupPoll(); }).catch(function(e){ toast(e.message, 'err'); });
+}
+$('btnAudioDup').addEventListener('click', function(){ $('dupModal').classList.add('on'); dupStart(); });
+$('dupClose').addEventListener('click', function(){ $('dupModal').classList.remove('on'); });
+$('dupModal').addEventListener('click', function(e){ if (e.target === this) this.classList.remove('on'); });
+$('dupRescan').addEventListener('click', dupStart);
+
+/* ================= 播放列表 ================= */
+var PL = { list: [], cur: null, pick: null, newSel: {}, addSel: [] };
+
+function plKeyClient(e){
+  if (e.hash) return 'h:' + String(e.hash).toLowerCase();
+  if (e.key) return 'k:' + String(e.key).toLowerCase();
+  return 'n:' + String(e.songName || '').toLowerCase();
+}
+function plBadge(pl){
+  if (pl.error) return '<span class="badge b-need">读取失败</span>';
+  if (!pl.count) return '<span class="badge b-need">空</span>';
+  if (pl.matched === pl.count) return '<span class="badge b-done">全部可用</span>';
+  return '<span class="badge b-pend2">缺 ' + (pl.count - pl.matched) + '</span>';
+}
+function renderPlaylists(j){
+  PL.list = (j && j.playlists) || [];
+  var html = '';
+  for (var i = 0; i < PL.list.length; i++){
+    var pl = PL.list[i];
+    html += '<tr>'
+      + '<td>' + (pl.hasImage ? '<img src="/api/playlists/image?file=' + encodeURIComponent(pl.file) + '" style="width:32px;height:32px;object-fit:cover;border-radius:6px" onerror="this.style.visibility=&#39;hidden&#39;">' : '<span class="small">—</span>') + '</td>'
+      + '<td><div><b>' + esc(pl.title) + '</b></div><div class="small mono">' + esc(pl.file) + (pl.description ? ' · ' + esc(pl.description) : '') + '</div></td>'
+      + '<td class="small">' + esc(pl.author || '—') + '</td>'
+      + '<td>' + pl.count + '</td>'
+      + '<td>' + plBadge(pl) + '<div class="small">本地 ' + pl.matched + ' / ' + pl.count + '</div></td>'
+      + '<td class="small mono">' + fmtDur(pl.durSec) + (pl.matched < pl.count ? '<div class="small" style="color:var(--dim)">本地 ' + pl.matched + ' 首</div>' : '') + '</td>'
+      + '<td><button class="btn btn-sm" data-plact="edit" data-file="' + esc(pl.file) + '">✏️ 管理</button> '
+      + '<button class="btn btn-sm gray" data-plact="copy" data-file="' + esc(pl.file) + '">📄 复制</button> '
+      + '<button class="btn btn-sm gray" data-plact="del" data-file="' + esc(pl.file) + '">🗑</button></td>'
+      + '</tr>';
+  }
+  $('plBody').innerHTML = html || '<tr><td colspan="7" class="small">还没有播放列表 — 点「＋ 新建播放列表」创建一个吧</td></tr>';
+  var songs = 0;
+  for (var k = 0; k < PL.list.length; k++) songs += PL.list[k].count;
+  $('plSummary').textContent = PL.list.length + ' 个播放列表 · 共 ' + songs + ' 条歌曲';
+}
+function loadPlaylists(){ return api('/api/playlists').then(function(j){ renderPlaylists(j); return j; }); }
+
+/* --- 编辑 --- */
+function plOpenEdit(file){
+  api('/api/playlists/detail?file=' + encodeURIComponent(file)).then(function(j){
+    PL.cur = { file: j.file, songs: (j.songs || []).map(function(s){
+      return { key: s.key, hash: s.hash, songName: s.songName, levelAuthorName: s.levelAuthorName,
+               matched: s.matched, folder: s.folder, name: s.name, artist: s.artist, hasVideo: s.hasVideo, durSec: s.durSec || 0 };
+    }) };
+    $('plTitle').value = j.title || '';
+    $('plAuthor').value = j.author || '';
+    $('plDesc').value = j.description || '';
+    $('plEditSub').textContent = j.file;
+    renderPlEdit();
+    $('plEditModal').classList.add('on');
+    plDlPoll();
+  }).catch(function(e){ toast(e.message, 'err'); });
+}
+function renderPlEdit(){
+  var c = PL.cur; if (!c) return;
+  var html = '', miss = 0;
+  for (var i = 0; i < c.songs.length; i++){
+    var s = c.songs[i];
+    if (!s.matched) miss++;
+    html += '<div class="plrow">'
+      + '<span class="small mono" style="width:26px;text-align:right">' + (i + 1) + '</span>'
+      + '<span style="flex:1;min-width:180px">' + (s.matched
+            ? ('<b>' + esc(s.name) + '</b>' + (s.artist ? ' <span class="small">· ' + esc(s.artist) + '</span>' : '') + (s.hasVideo ? ' <span class="small">🎬</span>' : ''))
+            : ('<b>' + esc(s.songName || s.key || '(未知)') + '</b> <span class="small" style="color:#ff9f43">本地没有</span>')) + '</span>'
+      + '<span class="small mono" style="max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(s.matched ? s.folder : (s.hash ? String(s.hash).slice(0, 12) : (s.key || ''))) + '</span>'
+      + '<span class="small mono" style="width:56px;text-align:right;color:var(--dim)" title="歌曲时长">' + (s.matched ? fmtDur(s.durSec) : '') + '</span>'
+      + (s.matched ? ' <button class="btn gray btn-sm" data-lplact="pv" data-i="' + i + '" title="试看/试听">' + (s.hasVideo ? '🎬' : '🎧') + '</button>' : '')
+      + (!s.matched ? ((s.key || s.hash)
+            ? ' <button class="btn btn-sm" data-lplact="dl" data-i="' + i + '" title="从 BeatSaver 下载这个谱面">⬇ 下载</button>'
+            : ' <span class="small" style="color:#ff9f43" title="条目里没有 key/hash，无法定位谱面">无 key/hash</span>') : '')
+      + ' <button class="btn gray btn-sm" data-lplact="up" data-i="' + i + '" title="上移">↑</button>'
+      + ' <button class="btn gray btn-sm" data-lplact="down" data-i="' + i + '" title="下移">↓</button>'
+      + ' <button class="btn gray btn-sm" data-lplact="rm" data-i="' + i + '" title="移除">✕</button>'
+      + '</div>';
+  }
+  $('plSongs').innerHTML = html || '<div class="hint" style="padding:8px">（这个歌单还没有歌曲 — 点「＋ 添加歌曲…」）</div>';
+  $('plEditStat').textContent = c.songs.length + ' 首 · 本地有 ' + (c.songs.length - miss) + ' · 缺失 ' + miss;
+  var pt = 0; for (var j = 0; j < c.songs.length; j++) pt += (c.songs[j].durSec || 0);
+  $('plEditStat').textContent += ' · 总时长 ' + fmtDur(Math.round(pt));
+  var canDl = c.songs.filter(function(s){ return !s.matched && (s.key || s.hash); }).length;
+  var btn = $('plDlMissing');
+  if (btn){ btn.textContent = '⬇ 下载全部缺失' + (canDl ? (' (' + canDl + ')') : ''); btn.disabled = !canDl; floatHint(miss - canDl); }
+}
+function floatHint(unlocatable){ if (unlocatable > 0) $('plEditStat').textContent += '（其中 ' + unlocatable + ' 条无 key/hash，无法下载）'; }
+$('plSongs').addEventListener('click', function(ev){
+  var el = ev.target.closest ? ev.target.closest('[data-lplact]') : null; if (!el) return;
+  var i = parseInt(el.dataset.i, 10), c = PL.cur; if (!c || !c.songs[i]) return;
+  var a = el.dataset.lplact;
+  if (a === 'pv'){ var s = c.songs[i]; if (s.hasVideo) pvOpen(s.folder); else ldOpen(s.folder, s.name || s.folder, s.artist || ''); return; }
+  if (a === 'dl'){ var t = c.songs[i]; plStartDownload([{ key: t.key || '', hash: t.hash || '', songName: t.songName || '' }]); return; }
+  if (a === 'rm') c.songs.splice(i, 1);
+  else if (a === 'up' && i > 0) c.songs.splice(i - 1, 0, c.songs.splice(i, 1)[0]);
+  else if (a === 'down' && i < c.songs.length - 1) c.songs.splice(i + 1, 0, c.songs.splice(i, 1)[0]);
+  renderPlEdit();
+});
+$('plSave').addEventListener('click', function(){
+  if (!PL.cur) return;
+  var songs = PL.cur.songs.map(function(s){
+    var o = { songName: s.songName || '' };
+    if (s.key) o.key = s.key;
+    if (s.hash) o.hash = s.hash;
+    if (s.levelAuthorName) o.levelAuthorName = s.levelAuthorName;
+    return o;
+  });
+  api('/api/playlists/save', 'POST', {
+    file: PL.cur.file, title: $('plTitle').value.trim(), author: $('plAuthor').value.trim(),
+    description: $('plDesc').value.trim(), songs: songs
+  }).then(function(j){ toast('已保存：' + j.file + '（' + j.count + ' 首）', 'ok'); loadPlaylists(); })
+    .catch(function(e){ toast(e.message, 'err'); });
+});
+$('plCleanMissing').addEventListener('click', function(){
+  if (!PL.cur) return;
+  var before = PL.cur.songs.length;
+  PL.cur.songs = PL.cur.songs.filter(function(s){ return s.matched; });
+  renderPlEdit();
+  toast('已移除 ' + (before - PL.cur.songs.length) + ' 条本地缺失项（点💾保存才生效）', 'warn');
+});
+$('plAddSongs').addEventListener('click', function(){
+  var locked = {}; if (PL.cur) PL.cur.songs.forEach(function(s){ if (s.matched && s.folder) locked[s.folder] = 1; });
+  plOpenPicker([], plAppendFolders, { locked: locked, lockedLabel: '已在歌单中' });
+});
+$('plDlMissing').addEventListener('click', function(){ plStartDownload(plMissingItems()); });
+$('plDlMissing').disabled = true;
+/* --- 谱面下载（补「本地没有」） --- */
+var MAPDL = { timer: null, handledFinish: 0 };
+function plMissingItems(){
+  if (!PL.cur) return [];
+  return PL.cur.songs.filter(function(s){ return !s.matched && (s.key || s.hash); })
+    .map(function(s){ return { key: s.key || '', hash: s.hash || '', songName: s.songName || '' }; });
+}
+function plStartDownload(items){
+  if (!items || !items.length){ toast('没有可下载的条目（需要 key 或 hash）', 'warn'); return; }
+  api('/api/mapdownload/start', 'POST', { items: items }).then(function(j){
+    toast('开始下载 ' + j.total + ' 首谱面…', 'ok');
+    plDlPoll();
+  }).catch(function(e){ toast(e.message, 'err'); });
+}
+function plDlPoll(){
+  if (MAPDL.timer) return;
+  fetch('/api/mapdownload/status').then(function(r){ return r.json(); }).then(function(j){
+    var el = $('plDlStatus');
+    if (el) el.textContent = j.running
+      ? ('⬇ 正在下载 ' + j.done + '/' + j.total + ' · 安装 ' + j.ok + ' · 跳过 ' + j.skipped + ' · 失败 ' + j.fail + (j.current ? (' — ' + j.current) : ''))
+      : (j.total ? ('上次下载：安装 ' + j.ok + ' · 跳过 ' + j.skipped + ' · 失败 ' + j.fail + (j.finishedAt ? ('（' + new Date(j.finishedAt).toLocaleTimeString() + '）') : '')) : '');
+    if (j.running){ MAPDL.timer = setTimeout(plDlPoll, 900); }
+    else {
+      MAPDL.timer = null;
+      if (j.total && j.finishedAt && MAPDL.handledFinish !== j.finishedAt){
+        MAPDL.handledFinish = j.finishedAt;
+        if (j.fail) toast('谱面下载完成：安装 ' + j.ok + ' / 失败 ' + j.fail, j.ok ? 'warn' : 'err');
+        else toast('谱面下载完成：新增 ' + j.ok + ' 首（跳过 ' + j.skipped + '）', 'ok');
+        if (PL.cur && $('plEditModal').classList.contains('on')) plOpenEdit(PL.cur.file);
+      }
+    }
+  }).catch(function(){ MAPDL.timer = null; });
+}
+function plAppendFolders(folders){
+  if (!PL.cur) return;
+  var seen = {}; PL.cur.songs.forEach(function(s){ seen[plKeyClient(s)] = 1; });
+  var added = 0, dup = 0;
+  (folders || []).forEach(function(fo){
+    var r = null; for (var i = 0; i < S.songs.length; i++) if (S.songs[i].folder === fo){ r = S.songs[i]; break; }
+    if (!r) return;
+    var e = { key: r.key || '', hash: (r.hash || '').toLowerCase(), songName: r.name || fo, levelAuthorName: r.mapper || '',
+              matched: true, folder: r.folder, name: r.name, artist: r.artist, hasVideo: !!r.hasVideo, durSec: r.durSec || 0 };
+    var k = plKeyClient(e); if (seen[k]){ dup++; return; }
+    seen[k] = 1; PL.cur.songs.push(e); added++;
+  });
+  renderPlEdit();
+  toast('已添加 ' + added + ' 首' + (dup ? ('（跳过重复 ' + dup + ' 首）') : ''), 'ok');
+}
+function plEditFolderOpen(){ api('/api/playlists/openfolder').catch(function(){}); }
+$('plEditFolder').addEventListener('click', plEditFolderOpen);
+$('plEditClose').addEventListener('click', function(){ $('plEditModal').classList.remove('on'); });
+$('plEditModal').addEventListener('click', function(e){ if (e.target === this) this.classList.remove('on'); });
+
+/* --- 新建 --- */
+function plNewOpen(){
+  $('plNewTitle').value = ''; $('plNewAuthor').value = ''; $('plNewDesc').value = '';
+  PL.newSel = {}; plNewStat();
+  $('plNewModal').classList.add('on');
+}
+function plNewStat(){
+  var n = 0; for (var k in PL.newSel) if (PL.newSel[k]) n++;
+  $('plNewStat').textContent = '已选 ' + n + ' 首';
+}
+$('btnPlNew').addEventListener('click', plNewOpen);
+$('plNewClose').addEventListener('click', function(){ $('plNewModal').classList.remove('on'); });
+$('plNewModal').addEventListener('click', function(e){ if (e.target === this) this.classList.remove('on'); });
+$('plNewPick').addEventListener('click', function(){
+  plOpenPicker(Object.keys(PL.newSel || {}), function(folders){
+    PL.newSel = {}; folders.forEach(function(f){ PL.newSel[f] = 1; }); plNewStat();
+  });
+});
+$('plNewOk').addEventListener('click', function(){
+  var title = $('plNewTitle').value.trim();
+  if (!title){ toast('请先填标题', 'warn'); return; }
+  var folders = []; for (var k in PL.newSel) if (PL.newSel[k]) folders.push(k);
+  api('/api/playlists/create', 'POST', {
+    title: title, author: $('plNewAuthor').value.trim(), description: $('plNewDesc').value.trim(), folders: folders
+  }).then(function(j){
+    toast('已创建：' + j.file + '（' + j.count + ' 首' + (j.skipped ? '，去重 ' + j.skipped : '') + '）', 'ok');
+    $('plNewModal').classList.remove('on');
+    loadPlaylists();
+  }).catch(function(e){ toast(e.message, 'err'); });
+});
+
+/* --- 选歌器 --- */
+function plPickRows(){
+  var kw = ($('plPickSearch').value || '').trim().toLowerCase();
+  var flt = $('plPickFilter').value;
+  return S.songs.slice().sort(cmpSongRows).filter(function(r){
+    if (flt === 'novid' && r.hasVideo) return false;
+    if (flt === 'vid' && !r.hasVideo) return false;
+    if (kw && (String(r.name || '') + ' ' + String(r.folder || '') + ' ' + String(r.artist || '')).toLowerCase().indexOf(kw) < 0) return false;
+    return true;
+  });
+}
+function plOpenPicker(initialSel, onOk, opts){
+  if (!S.songs.length){
+    toast('正在加载歌曲列表…');
+    loadSongs().then(function(){ plOpenPicker(initialSel, onOk, opts); });
+    return;
+  }
+  var lk = (opts && opts.locked) || null;
+  if (lk && !Object.keys(lk).length) lk = null;
+  PL.pick = { sel: {}, onOk: onOk, locked: lk, lockedLabel: (opts && opts.lockedLabel) || '已加入' };
+  (initialSel || []).forEach(function(f){ PL.pick.sel[f] = 1; });
+  $('plPickSearch').value = ''; $('plPickFilter').value = 'all';
+  renderPlPick();
+  $('plPickModal').classList.add('on');
+}
+function plPickNewList(){ var o = []; for (var k in PL.pick.sel) if (PL.pick.sel[k] && !(PL.pick.locked && PL.pick.locked[k])) o.push(k); return o; }
+function plPickStatUpdate(){
+  if (!PL.pick) return;
+  var rows = plPickRows(), lockedN = PL.pick.locked ? Object.keys(PL.pick.locked).length : 0;
+  $('plPickStat').textContent = lockedN
+    ? ('显示 ' + rows.length + ' 首 · 可新增 ' + plPickNewList().length + ' 首 · ' + PL.pick.lockedLabel + ' ' + lockedN + ' 首')
+    : ('显示 ' + rows.length + ' 首 · 已选 ' + plPickNewList().length + ' 首');
+}
+function renderPlPick(){
+  if (!PL.pick) return;
+  var rows = plPickRows(), html = '', lk = PL.pick.locked || {};
+  for (var i = 0; i < rows.length; i++){
+    var r = rows[i], inList = !!lk[r.folder], on = inList || !!PL.pick.sel[r.folder];
+    html += '<label class="plpickrow"' + (inList ? ' style="opacity:.62"' : '') + '>'
+      + '<input type="checkbox" class="songchk" data-pfpick="' + esc(r.folder) + '"' + (on ? ' checked' : '') + (inList ? ' disabled' : '') + '>'
+      + '<span class="plpickname"><b>' + esc(r.name) + '</b>' + (r.artist ? ' <span class="small">· ' + esc(r.artist) + '</span>' : '')
+      + (inList ? ' <span class="small" style="color:var(--accent);border:1px solid var(--line);border-radius:999px;padding:1px 8px">' + esc(PL.pick.lockedLabel) + '</span>' : '')
+      + '<div class="small mono">' + esc(r.folder) + (r.hasVideo ? ' · 🎬' : '') + '</div></span></label>';
+  }
+  $('plPickBody').innerHTML = html || '<div class="hint" style="padding:8px">没有匹配的歌曲</div>';
+  plPickStatUpdate();
+}
+$('plPickBody').addEventListener('change', function(ev){
+  var el = ev.target;
+  if (!el || el.type !== 'checkbox' || !el.dataset.pfpick) return;
+  if (el.checked) PL.pick.sel[el.dataset.pfpick] = 1; else delete PL.pick.sel[el.dataset.pfpick];
+  plPickStatUpdate();
+});
+$('plPickSearch').addEventListener('input', renderPlPick);
+$('plPickFilter').addEventListener('change', renderPlPick);
+$('plPickAll').addEventListener('click', function(){
+  plPickRows().forEach(function(r){ if (!(PL.pick.locked && PL.pick.locked[r.folder])) PL.pick.sel[r.folder] = 1; });
+  renderPlPick();
+});
+$('plPickNone').addEventListener('click', function(){
+  for (var k in PL.pick.sel) if (!(PL.pick.locked && PL.pick.locked[k])) delete PL.pick.sel[k];
+  renderPlPick();
+});
+$('plPickClose').addEventListener('click', function(){ $('plPickModal').classList.remove('on'); });
+$('plPickModal').addEventListener('click', function(e){ if (e.target === this) this.classList.remove('on'); });
+$('plPickOk').addEventListener('click', function(){
+  var f = plPickNewList();
+  $('plPickModal').classList.remove('on');
+  if (PL.pick.onOk) PL.pick.onOk(f);
+});
+
+/* --- 歌曲页：勾选 → 加入歌单 --- */
+function selSongFolders(){
+  var out = [];
+  Array.prototype.forEach.call(document.querySelectorAll('#songsBody .songchk:checked'), function(b){ out.push(b.dataset.folder); });
+  return out;
+}
+$('chkAll').addEventListener('change', function(){
+  var on = this.checked;
+  Array.prototype.forEach.call(document.querySelectorAll('#songsBody .songchk'), function(b){ b.checked = on; });
+});
+$('btnPlAdd').addEventListener('click', function(){
+  var fs = selSongFolders();
+  if (!fs.length){ toast('先在列表里勾选要加入的歌曲（左侧复选框）', 'warn'); return; }
+  PL.addSel = fs;
+  api('/api/playlists').then(function(j){
+    var list = j.playlists || [];
+    if (!list.length){ $('plAddModal').classList.remove('on'); plNewWithFolders(fs); return; }
+    $('plAddInfo').innerHTML = '已勾选 <b>' + fs.length + '</b> 首歌曲，选择要加入的歌单：';
+    $('plAddTarget').innerHTML = list.map(function(p){
+      return '<option value="' + esc(p.file) + '">' + esc(p.title) + ' （' + p.count + ' 首）</option>';
+    }).join('');
+    $('plAddModal').classList.add('on');
+  }).catch(function(e){ toast(e.message, 'err'); });
+});
+function plNewWithFolders(folders){
+  plNewOpen();
+  PL.newSel = {}; (folders || []).forEach(function(f){ PL.newSel[f] = 1; }); plNewStat();
+  $('plNewModal').classList.add('on');
+}
+$('plAddClose').addEventListener('click', function(){ $('plAddModal').classList.remove('on'); });
+$('plAddModal').addEventListener('click', function(e){ if (e.target === this) this.classList.remove('on'); });
+$('plAddNew').addEventListener('click', function(){ $('plAddModal').classList.remove('on'); plNewWithFolders(PL.addSel); });
+$('plAddOk').addEventListener('click', function(){
+  var f = $('plAddTarget').value; if (!f) return;
+  api('/api/playlists/add', 'POST', { file: f, folders: PL.addSel || [] }).then(function(j){
+    toast('已加入 ' + j.added + ' 首' + (j.skipped ? ('（跳过重复 ' + j.skipped + ' 首）') : ''), 'ok');
+    $('plAddModal').classList.remove('on');
+    loadPlaylists();
+  }).catch(function(e){ toast(e.message, 'err'); });
+});
+
+/* --- 歌单行操作（管理/复制/删除） --- */
+$('btnPlRefresh').addEventListener('click', function(){ loadPlaylists().then(function(){ toast('已刷新', 'ok'); }); });
+$('btnPlFolder').addEventListener('click', plEditFolderOpen);
+document.addEventListener('click', function(ev){
+  var el = ev.target.closest ? ev.target.closest('[data-plact]') : null; if (!el) return;
+  var act = el.dataset.plact, file = el.dataset.file;
+  if (act === 'edit') plOpenEdit(file);
+  else if (act === 'copy'){
+    api('/api/playlists/copy', 'POST', { file: file }).then(function(j){ toast('已复制为 ' + j.file, 'ok'); loadPlaylists(); })
+      .catch(function(e){ toast(e.message, 'err'); });
+  } else if (act === 'del'){
+    if (!confirm('删除歌单「' + file + '」？\n（会先备份到 工具目录\\播放列表备份\\）')) return;
+    api('/api/playlists/delete', 'POST', { file: file }).then(function(){ toast('已删除：' + file, 'ok'); loadPlaylists(); })
+      .catch(function(e){ toast(e.message, 'err'); });
+  }
+});
+
+/* ================= 无缝挑战（SetlistChallenge） ================= */
+var CH = { list: [], cur: null, newSel: {}, stars: {} };
+var CH_DIFFS = ['Easy', 'Normal', 'Hard', 'Expert', 'ExpertPlus'];
+
+function chDiffSelect(sel, folder){
+  var st = (folder && CH.stars && CH.stars[folder]) || null;
+  var h = '';
+  for (var i = 0; i < CH_DIFFS.length; i++){
+    var d = CH_DIFFS[i];
+    var s = (st && st[d] != null && st[d] > 0) ? (' \u2605' + st[d]) : '';
+    h += '<option value="' + d + '"' + (d === sel ? ' selected' : '') + '>' + d + s + '</option>';
+  }
+  return '<select class="chdiff" style="min-width:150px">' + h + '</select>';
+}
+function chFailLabel(c){
+  if (c.failEndsRun === true) return '<span class="badge b-pend2">失败即结束</span>';
+  if (c.failEndsRun === false) return '<span class="badge b-done">NoFail 式</span>';
+  return '<span class="badge b-need">跟随设置</span>';
+}
+function renderChallenges(j){
+  CH.list = (j && j.challenges) || [];
+  var html = '';
+  for (var i = 0; i < CH.list.length; i++){
+    var c = CH.list[i];
+    html += '<tr>'
+      + '<td><div><b>' + esc(c.title) + '</b></div>' + (c.error ? '<div class="small" style="color:#ff7f7f">读取失败</div>' : '') + '</td>'
+      + '<td><span class="badge ' + (c.mode === 'random' ? 'b-pend' : 'b-done') + '">' + esc(c.mode) + '</span></td>'
+      + '<td>' + (c.mode === 'random' ? ('~' + ((c.filter && c.filter.count) || '?')) : c.count) + '</td>'
+      + '<td class="small mono">' + fmtDur(c.durSec) + '</td>'
+      + '<td>' + chFailLabel(c) + '</td>'
+      + '<td class="small mono">' + esc(c.file) + '</td>'
+      + '<td><button class="btn btn-sm" data-chact="edit" data-file="' + esc(c.file) + '">✏️ 编辑</button> '
+      + '<button class="btn btn-sm gray" data-chact="copy" data-file="' + esc(c.file) + '">📄 复制</button> '
+      + '<button class="btn btn-sm gray" data-chact="del" data-file="' + esc(c.file) + '">🗑</button></td>'
+      + '</tr>';
+  }
+  $('chBody').innerHTML = html || '<tr><td colspan="7" class="small">还没有挑战 — 点「＋ 新建挑战」</td></tr>';
+  $('chSummary').textContent = CH.list.length + ' 个挑战' + (j && j.dir ? (' · ' + j.dir) : '');
+}
+function loadChallenges(){ return api('/api/challenges').then(function(j){ renderChallenges(j); return j; }); }
+
+function chRenderSongs(){
+  var c = CH.cur; if (!c) return;
+  if (c.mode !== 'setlist'){ $('chSongs').innerHTML = ''; $('chStat').textContent = '随机模式'; return; }
+  var html = '', miss = 0;
+  for (var i = 0; i < c.entries.length; i++){
+    var e = c.entries[i];
+    if (!e.found) miss++;
+    html += '<div class="plrow">'
+      + '<span class="chdrag" draggable="true" title="按住拖动排序">⠿</span>'
+      + '<span class="small mono" style="width:26px;text-align:right">' + (i + 1) + '</span>'
+      + '<span style="flex:1;min-width:170px">' + (e.found ? ('<b>' + esc(e.name) + '</b>' + (e.artist ? ' <span class="small">· ' + esc(e.artist) + '</span>' : '')) : ('<b>' + esc(e.folder || '(空)') + '</b> <span class="small" style="color:#ff9f43">本地没有</span>')) + '</span>'
+      + chDiffSelect(e.difficulty, e.found ? e.folder : null)
+      + '<span class="small mono" style="width:56px;text-align:right;color:var(--dim)" title="歌曲时长">' + (e.found ? fmtDur(e.durSec) : '') + '</span>'
+      + ' <button class="btn gray btn-sm" data-chsong="rm" data-i="' + i + '" title="移除">✕</button>'
+      + '</div>';
+  }
+  $('chSongs').innerHTML = html || '<div class="hint" style="padding:8px">（还没选歌 — 点「＋ 添加歌曲…」）</div>';
+  var total = 0; for (var j = 0; j < c.entries.length; j++) total += (c.entries[j].durSec || 0);
+  $('chStat').textContent = c.entries.length + ' 首 · 本地有 ' + (c.entries.length - miss) + ' · 缺 ' + miss + ' · 总时长 ' + fmtDur(Math.round(total));
+}
+function chLoadStars(){
+  var c = CH.cur; if (!c || c.mode !== 'setlist') return;
+  var want = [];
+  c.entries.forEach(function(e){ if (e.found && e.folder && !(CH.stars[e.folder])) want.push(e.folder); });
+  if (!want.length) return;
+  api('/api/mapstars?folders=' + encodeURIComponent(want.join('|'))).then(function(j){
+    var got = (j && j.stars) || {};
+    want.forEach(function(f){ var v = got[f]; CH.stars[f] = (v && v.stars) ? v.stars : {}; });
+    chRenderSongs();
+  }).catch(function(){ want.forEach(function(f){ if (!CH.stars[f]) CH.stars[f] = {}; }); });
+}
+function chApplyControls(){
+  var c = CH.cur; if (!c) return;
+  $('chTitle').value = c.title || '';
+  $('chMode').value = c.mode || 'setlist';
+  $('chFail').value = (c.failEndsRun === null || c.failEndsRun === undefined) ? '' : String(c.failEndsRun);
+  $('chSkip').value = (c.skipResults === null || c.skipResults === undefined) ? '' : String(c.skipResults);
+  $('chShuffle').checked = !!c.shuffle;
+  var isRandom = c.mode === 'random';
+  $('chSetlistWrap').style.display = isRandom ? 'none' : '';
+  $('chRandomWrap').style.display = isRandom ? '' : 'none';
+  if (isRandom){
+    var f = c.filter || {};
+    $('chFDiff').innerHTML = CH_DIFFS.map(function(d){ return '<option value="' + d + '"' + ((f.difficulty || 'ExpertPlus') === d ? ' selected' : '') + '>' + d + '</option>'; }).join('');
+    $('chFCount').value = f.count || 10;
+    $('chFDur').value = f.durationMinutes || 0;
+    $('chFMinNps').value = (f.minNps === undefined || f.minNps === null) ? '' : f.minNps;
+    $('chFMaxNps').value = (f.maxNps === undefined || f.maxNps === null) ? '' : f.maxNps;
+    $('chFNoodle').checked = !!f.requireNoodle;
+    $('chFChroma').checked = !!f.requireChroma;
+    $('chFPlaylist').value = f.playlist || '';
+  } else {
+    chRenderSongs();
+  }
+}
+function chOpenEdit(file){
+  api('/api/challenges/detail?file=' + encodeURIComponent(file)).then(function(j){
+    CH.cur = { file: j.file, title: j.title, mode: j.mode, failEndsRun: j.failEndsRun, skipResults: j.skipResults, shuffle: j.shuffle, filter: j.filter, entries: j.entries };
+    $('chEditSub').textContent = j.file;
+    chApplyControls();
+    $('chEditModal').classList.add('on');
+    chLoadStars();
+  }).catch(function(e){ toast(e.message, 'err'); });
+}
+$('chMode').addEventListener('change', function(){ if (CH.cur){ CH.cur.mode = this.value; chApplyControls(); } });
+$('chSongs').addEventListener('click', function(ev){
+  var el = ev.target.closest ? ev.target.closest('[data-chsong]') : null; if (!el) return;
+  var i = parseInt(el.dataset.i, 10), c = CH.cur; if (!c || !c.entries[i]) return;
+  var a = el.dataset.chsong;
+  if (a === 'rm') c.entries.splice(i, 1);
+  else if (a === 'up' && i > 0) c.entries.splice(i - 1, 0, c.entries.splice(i, 1)[0]);
+  else if (a === 'down' && i < c.entries.length - 1) c.entries.splice(i + 1, 0, c.entries.splice(i, 1)[0]);
+  chRenderSongs();
+});
+/* 拖动排序（HTML5 DnD） */
+var chDragFrom = null;
+$('chSongs').addEventListener('dragstart', function(ev){
+  if (!ev.target.closest || !ev.target.closest('.chdrag')) return;  /* 仅从 ⠿ 手柄拖动，避免吃掉行内下拉框/按钮的点击 */
+  var row = ev.target.closest ? ev.target.closest('.plrow') : null;
+  if (!row || !CH.cur || CH.cur.mode !== 'setlist'){ ev.preventDefault(); return; }
+  chDragFrom = Array.prototype.slice.call($('chSongs').querySelectorAll('.plrow')).indexOf(row);
+  row.classList.add('dragging');
+  try{ ev.dataTransfer.effectAllowed = 'move'; ev.dataTransfer.setData('text/plain', String(chDragFrom)); }catch(e){}
+});
+$('chSongs').addEventListener('dragover', function(ev){
+  if (chDragFrom === null) return;
+  ev.preventDefault();
+  try{ ev.dataTransfer.dropEffect = 'move'; }catch(e){}
+  Array.prototype.slice.call($('chSongs').querySelectorAll('.plrow')).forEach(function(r){ r.classList.remove('dragover-top','dragover-bottom'); });
+  var row = ev.target.closest ? ev.target.closest('.plrow') : null; if (!row) return;
+  var rect = row.getBoundingClientRect();
+  row.classList.add((ev.clientY - rect.top) > rect.height / 2 ? 'dragover-bottom' : 'dragover-top');
+});
+$('chSongs').addEventListener('drop', function(ev){
+  if (chDragFrom === null) return;
+  ev.preventDefault();
+  var c = CH.cur; if (!c){ chDragFrom = null; return; }
+  var rows = Array.prototype.slice.call($('chSongs').querySelectorAll('.plrow'));
+  var row = ev.target.closest ? ev.target.closest('.plrow') : null;
+  var to;
+  if (row){ var rect = row.getBoundingClientRect(); to = rows.indexOf(row); if ((ev.clientY - rect.top) > rect.height / 2) to++; }
+  else to = c.entries.length;
+  var from = chDragFrom; if (to > from) to--;
+  if (to < 0) to = 0; if (to > c.entries.length - 1) to = c.entries.length - 1;
+  if (to !== from){ var m = c.entries.splice(from, 1)[0]; c.entries.splice(to, 0, m); }
+  chDragFrom = null;
+  chRenderSongs();
+});
+$('chSongs').addEventListener('dragend', function(){
+  chDragFrom = null;
+  Array.prototype.slice.call($('chSongs').querySelectorAll('.plrow')).forEach(function(r){ r.classList.remove('dragging','dragover-top','dragover-bottom'); });
+});
+$('chSongs').addEventListener('change', function(ev){
+  var el = ev.target; if (!el || !el.classList || !el.classList.contains('chdiff')) return;
+  var row = el.closest('.plrow');
+  var idx = -1; var rows = Array.prototype.slice.call($('chSongs').querySelectorAll('.plrow'));
+  idx = rows.indexOf(row);
+  if (CH.cur && CH.cur.entries[idx]) CH.cur.entries[idx].difficulty = el.value;
+});
+$('chAddSongs').addEventListener('click', function(){
+  var locked = {}; if (CH.cur) CH.cur.entries.forEach(function(e){ if (e && e.folder) locked[e.folder] = 1; });
+  plOpenPicker([], function(folders){
+    if (!CH.cur) return;
+    var seen = {}; CH.cur.entries.forEach(function(e){ seen[e.folder] = 1; });
+    var added = 0;
+    (folders || []).forEach(function(fo){
+      if (seen[fo]) return; seen[fo] = 1;
+      var r = null; for (var i = 0; i < S.songs.length; i++) if (S.songs[i].folder === fo){ r = S.songs[i]; break; }
+      CH.cur.entries.push({ folder: fo, levelId: (r && r.levelId) || '', characteristic: 'Standard', difficulty: 'ExpertPlus', found: !!r, name: r ? r.name : '', artist: r ? r.artist : '' });
+      added++;
+    });
+    fillDurations(CH.cur.entries).then(function(){ chRenderSongs(); });
+    chLoadStars();
+    toast('已添加 ' + added + ' 首', 'ok');
+  }, { locked: locked, lockedLabel: '已在挑战中' });
+});
+
+/* —— 从播放列表导入挑战 —— */
+$('chImportPl').addEventListener('click', function(){
+  if (!CH.cur) return;
+  CH.pl = { songs: [] };
+  $('chPlDiff').innerHTML = CH_DIFFS.map(function(d){ return '<option value="' + d + '"' + (d === 'ExpertPlus' ? ' selected' : '') + '>' + d + '</option>'; }).join('');
+  api('/api/playlists').then(function(j){
+    var list = (j && j.playlists) || [];
+    var h = '';
+    list.forEach(function(pl){ h += '<option value="' + esc(pl.file) + '">' + esc(pl.title) + '（' + pl.count + ' 首 · 本地 ' + pl.matched + '）</option>'; });
+    $('chPlSel').innerHTML = h || '<option value="">（没有播放列表）</option>';
+    $('chPlStat').textContent = '—';
+    $('chPlModal').classList.add('on');
+    if (list.length) chPlLoadDetail();
+  }).catch(function(e){ toast('读取播放列表失败：' + e.message, 'err'); });
+});
+function chPlLoadDetail(){
+  var f = $('chPlSel').value; if (!f) return;
+  $('chPlStat').textContent = '读取中…';
+  api('/api/playlists/detail?file=' + encodeURIComponent(f)).then(function(j){
+    CH.pl = { file: f, songs: j.songs || [] };
+    var n = 0; CH.pl.songs.forEach(function(s){ if (s.matched) n++; });
+    $('chPlStat').textContent = '共 ' + CH.pl.songs.length + ' 首 · 可导入 ' + n + ' 首';
+  }).catch(function(e){ CH.pl = { songs: [] }; $('chPlStat').textContent = '⚠ ' + e.message; });
+}
+$('chPlSel').addEventListener('change', chPlLoadDetail);
+$('chPlClose').addEventListener('click', function(){ $('chPlModal').classList.remove('on'); });
+$('chPlModal').addEventListener('click', function(e){ if (e.target === this) this.classList.remove('on'); });
+$('chPlOk').addEventListener('click', function(){
+  if (!CH.cur || !CH.pl || !CH.pl.songs || !CH.pl.songs.length){ toast('没有可导入的歌曲', 'warn'); return; }
+  var diff = $('chPlDiff').value || 'ExpertPlus';
+  var seen = {}; CH.cur.entries.forEach(function(e){ seen[e.folder] = 1; });
+  var added = 0, skipped = 0, dup = 0;
+  CH.pl.songs.forEach(function(s){
+    if (!s.matched || !s.folder){ skipped++; return; }
+    if (seen[s.folder]){ dup++; return; }
+    seen[s.folder] = 1;
+    var r = null; for (var i = 0; i < S.songs.length; i++) if (S.songs[i].folder === s.folder){ r = S.songs[i]; break; }
+    CH.cur.entries.push({ folder: s.folder, levelId: (r && r.levelId) || '', characteristic: 'Standard', difficulty: diff, found: true, name: (r && r.name) || s.name || '', artist: (r && r.artist) || s.artist || '' });
+    added++;
+  });
+  fillDurations(CH.cur.entries).then(function(){ chRenderSongs(); });
+  chLoadStars();
+  $('chPlModal').classList.remove('on');
+  toast('已导入 ' + added + ' 首' + (dup ? ('（重复 ' + dup + ' 首已跳过）') : '') + (skipped ? ('（本地没有 ' + skipped + ' 首已跳过）') : ''), 'ok');
+});
+function chCollect(){
+  var c = CH.cur; if (!c) return null;
+  c.title = $('chTitle').value.trim();
+  c.mode = $('chMode').value;
+  c.failEndsRun = $('chFail').value === '' ? null : ($('chFail').value === 'true');
+  c.skipResults = $('chSkip').value === '' ? null : ($('chSkip').value === 'true');
+  c.shuffle = $('chShuffle').checked;
+  if (c.mode === 'random'){
+    c.filter = {
+      difficulty: $('chFDiff').value || 'ExpertPlus',
+      count: parseInt($('chFCount').value, 10) || 10,
+      durationMinutes: parseInt($('chFDur').value, 10) || 0,
+      requireNoodle: $('chFNoodle').checked,
+      requireChroma: $('chFChroma').checked,
+      playlist: $('chFPlaylist').value.trim()
+    };
+    var mn = parseFloat($('chFMinNps').value), mx = parseFloat($('chFMaxNps').value);
+    if (!isNaN(mn)) c.filter.minNps = mn;
+    if (!isNaN(mx)) c.filter.maxNps = mx;
+  }
+  return { file: c.file, title: c.title, mode: c.mode, failEndsRun: c.failEndsRun, skipResults: c.skipResults, shuffle: c.shuffle, entries: c.entries, filter: c.filter };
+}
+$('chSave').addEventListener('click', chDoSave);
+$('chSave2').addEventListener('click', chDoSave);
+function chDoSave(){
+  var payload = chCollect(); if (!payload) return;
+  if (payload.mode === 'setlist' && !payload.entries.length){ toast('setlist 模式至少选一首歌', 'warn'); return; }
+  api('/api/challenges/save', 'POST', payload).then(function(j){ toast('已保存：' + j.file, 'ok'); $('chEditSub').textContent = j.file; loadChallenges(); })
+    .catch(function(e){ toast(e.message, 'err'); });
+}
+$('chEditClose').addEventListener('click', function(){ $('chEditModal').classList.remove('on'); });
+$('chEditModal').addEventListener('click', function(e){ if (e.target === this) this.classList.remove('on'); });
+$('chEditFolder').addEventListener('click', function(){ api('/api/challenges/openfolder').catch(function(){}); });
+
+/* 新建 */
+$('btnChNew').addEventListener('click', function(){
+  $('chNewTitle').value = ''; $('chNewMode').value = 'setlist'; CH.newSel = {}; chNewStat();
+  $('chNewModal').classList.add('on');
+});
+function chNewStat(){ var n = 0; for (var k in CH.newSel) if (CH.newSel[k]) n++; $('chNewStat').textContent = '已选 ' + n + ' 首（random 模式可跳过）'; }
+$('chNewPick').addEventListener('click', function(){
+  plOpenPicker(Object.keys(CH.newSel || {}), function(folders){ CH.newSel = {}; folders.forEach(function(f){ CH.newSel[f] = 1; }); chNewStat(); });
+});
+$('chNewOk').addEventListener('click', function(){
+  var title = $('chNewTitle').value.trim(); if (!title){ toast('请先填标题', 'warn'); return; }
+  var mode = $('chNewMode').value;
+  var entries = [];
+  for (var k in CH.newSel) if (CH.newSel[k]) entries.push({ folder: k, characteristic: 'Standard', difficulty: 'ExpertPlus' });
+  api('/api/challenges/save', 'POST', { title: title, mode: mode, failEndsRun: null, skipResults: null, shuffle: false, entries: entries, filter: mode === 'random' ? { difficulty: 'ExpertPlus', count: 10 } : undefined })
+    .then(function(j){ toast('已创建：' + j.file, 'ok'); $('chNewModal').classList.remove('on'); loadChallenges(); chOpenEdit(j.file); })
+    .catch(function(e){ toast(e.message, 'err'); });
+});
+$('chNewClose').addEventListener('click', function(){ $('chNewModal').classList.remove('on'); });
+$('chNewModal').addEventListener('click', function(e){ if (e.target === this) this.classList.remove('on'); });
+
+/* 游戏内设置 */
+$('btnChSettings').addEventListener('click', function(){
+  api('/api/challenges/settings').then(function(j){
+    var s = j.settings || { FailEndsRun: false, SkipResults: true, ShowProgressHud: true, TransitionReactionTimeMs: 500, TransitionGraceMs: 800 };
+    $('stFail').checked = !!s.FailEndsRun; $('stSkip').checked = !!s.SkipResults; $('stHud').checked = !!s.ShowProgressHud;
+    $('stReact').value = s.TransitionReactionTimeMs || 500; $('stGrace').value = s.TransitionGraceMs === undefined ? 800 : s.TransitionGraceMs;
+    $('stStat').textContent = '';
+    $('chSetModal').classList.add('on');
+  }).catch(function(e){ toast(e.message, 'err'); });
+});
+$('stSave').addEventListener('click', function(){
+  api('/api/challenges/settings', 'POST', {
+    FailEndsRun: $('stFail').checked, SkipResults: $('stSkip').checked, ShowProgressHud: $('stHud').checked,
+    TransitionReactionTimeMs: parseInt($('stReact').value, 10) || 500, TransitionGraceMs: parseInt($('stGrace').value, 10) || 0
+  }).then(function(){ toast('设置已保存', 'ok'); $('chSetModal').classList.remove('on'); }).catch(function(e){ toast(e.message, 'err'); });
+});
+$('chSetClose').addEventListener('click', function(){ $('chSetModal').classList.remove('on'); });
+$('chSetModal').addEventListener('click', function(e){ if (e.target === this) this.classList.remove('on'); });
+
+$('btnChRefresh').addEventListener('click', function(){ loadChallenges().then(function(){ toast('已刷新', 'ok'); }); });
+$('btnChFolder').addEventListener('click', function(){ api('/api/challenges/openfolder').catch(function(){}); });
+
+/* 挑战行操作 */
+document.addEventListener('click', function(ev){
+  var el = ev.target.closest ? ev.target.closest('[data-chact]') : null; if (!el) return;
+  var act = el.dataset.chact, file = el.dataset.file;
+  if (act === 'edit') chOpenEdit(file);
+  else if (act === 'copy'){
+    api('/api/challenges/detail?file=' + encodeURIComponent(file)).then(function(j){
+      return api('/api/challenges/save', 'POST', { title: (j.title || file) + ' 副本', mode: j.mode, failEndsRun: j.failEndsRun, skipResults: j.skipResults, shuffle: j.shuffle, entries: j.entries, filter: j.filter });
+    }).then(function(j){ toast('已复制为 ' + j.file, 'ok'); loadChallenges(); }).catch(function(e){ toast(e.message, 'err'); });
+  } else if (act === 'del'){
+    if (!confirm('删除挑战「' + file + '」？\n（会在同目录留一份 .bak_时间戳 备份）')) return;
+    api('/api/challenges/delete', 'POST', { file: file }).then(function(){ toast('已删除：' + file, 'ok'); loadChallenges(); }).catch(function(e){ toast(e.message, 'err'); });
+  }
+});
+
+</script>
+</body>
+</html>
+

@@ -1,0 +1,13 @@
+node_modules/
+logs/
+日志/
+tmp/
+缓存音频/
+工具配置.json
+网页版状态.json
+歌曲视频清单.csv
+视频链接.txt
+歌曲时长.json
+cookies.txt
+*.bak*
+*.log
