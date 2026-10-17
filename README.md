@@ -21,7 +21,7 @@
 | 项目 | 作用 | 何时需要 |
 |---|---|---|
 | **[SetlistChallenge](https://github.com/EuphonXD/SetlistChallenge)** | 无缝连打 mod（场景内换谱） | 想用本工具的 **🎬 无缝挑战** 页：工具会把挑战配置写进 `UserData\\SetlistChallenge\\*.json`，装了这个 mod 游戏内才能读 |
-| **[yt-pot-helper](https://github.com/EuphonXD/yt-pot-helper)** | YouTube PoToken 一键助手 | 批量下载报 *Sign in to confirm you’re not a bot* 时，在本机起一个 PoToken 服务给 yt-dlp 用 |
+| **[yt-pot-helper](https://github.com/EuphonXD/yt-pot-helper)** | YouTube PoToken + **Cookie Sync** 一键助手 | 批量下载报 *Sign in to confirm you’re not a bot* 时起 PoToken 服务；另自带 `sync-cookies.ps1`，从本机浏览器导出 YouTube cookies 后**直接推送到本工具的 Cookies 页**（POST `/api/cookies/import`） |
 | **Cinema / Theater**（游戏 mod） | 视频播放 | 必需：本工具只负责下载与写配置，播放靠它 |
 
 ---
@@ -38,6 +38,10 @@
 
 ### 📚 播放列表（基于本地谱面建歌单）
 ![播放列表](docs/shot_playlists.jpg)
+
+### 🎬 试看弹窗（偏移调整 / 频谱对比 / 自动对齐）
+
+![试看弹窗](docs/shot_preview.jpg)
 
 ---
 
@@ -119,6 +123,8 @@
   - 只有视频、没配置的歌：在工具里调一次偏移就会自动生成正确的配置
 
 ### 🎬 试看弹窗（偏移调整 / 频谱对比 / 自动对齐）
+
+![试看弹窗](docs/shot_preview.jpg)
 
 点列表里的 **🎬 试看** 打开：
 
