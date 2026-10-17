@@ -15,6 +15,19 @@
 **运行环境**：Windows / macOS / Linux + Node.js 18+
 
 ---
+## 界面预览
+
+### 🎵 歌曲总览（状态 / 时长 / YouTube 链接 / 偏移）
+![歌曲总览](docs/shot_songs.jpg)
+
+### ⚙️ 设置（代理 / 视频高度 / Cookies）
+![设置](docs/shot_settings.jpg)
+
+### 📚 播放列表（基于本地谱面建歌单）
+![播放列表](docs/shot_playlists.jpg)
+
+---
+
 
 # Beat Saber 视频工具 · 网页版 使用说明
 
