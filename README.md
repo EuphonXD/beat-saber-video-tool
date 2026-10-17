@@ -14,6 +14,19 @@
 **支持版本**：Beat Saber 1.40.x – 1.44.x（Cinema 全系；Theater v1.17）
 **运行环境**：Windows / macOS / Linux + Node.js 18+
 
+## 配套项目
+
+这三个仓库是同一套 Beat Saber 工具链，按需取用：
+
+| 项目 | 作用 | 何时需要 |
+|---|---|---|
+| **[SetlistChallenge](https://github.com/EuphonXD/SetlistChallenge)** | 无缝连打 mod（场景内换谱） | 想用本工具的 **🎬 无缝挑战** 页：工具会把挑战配置写进 `UserData\\SetlistChallenge\\*.json`，装了这个 mod 游戏内才能读 |
+| **[yt-pot-helper](https://github.com/EuphonXD/yt-pot-helper)** | YouTube PoToken 一键助手 | 批量下载报 *Sign in to confirm you’re not a bot* 时，在本机起一个 PoToken 服务给 yt-dlp 用 |
+| **Cinema / Theater**（游戏 mod） | 视频播放 | 必需：本工具只负责下载与写配置，播放靠它 |
+
+---
+
+
 ---
 ## 界面预览
 
